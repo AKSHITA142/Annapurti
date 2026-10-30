@@ -95,3 +95,4 @@ class MinConflictsSolver:
         )
 
         return current_assignment
+

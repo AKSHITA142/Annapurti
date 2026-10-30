@@ -329,3 +329,4 @@ def test_explain_service_audit_trail(test_db):
     for event in explanation["timeline"]:
         assert "reason_code" in event
         assert "message" in event
+
