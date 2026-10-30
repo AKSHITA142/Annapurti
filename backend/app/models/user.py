@@ -38,3 +38,4 @@ class ReceiverProfile(Base):
     priority_class = Column(String(50), default="standard", nullable=False)  # shelter, orphanage, community_kitchen, standard
 
     user = relationship("User", back_populates="receiver_profile")
+

@@ -23,3 +23,4 @@ class Vehicle(Base):
     # Relationships
     owner = relationship("User", back_populates="vehicles")
     jobs = relationship("DeliveryJob", back_populates="vehicle")
+

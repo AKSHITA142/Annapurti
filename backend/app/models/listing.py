@@ -53,3 +53,4 @@ class FoodListing(Base):
             + self.closed_lots
             == self.total_lots
         )
+

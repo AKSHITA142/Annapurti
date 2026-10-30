@@ -46,3 +46,4 @@ def stop_expiry_scheduler() -> None:
     if scheduler.running:
         scheduler.shutdown(wait=False)
         logger.info("Reservation expiry scheduler stopped")
+

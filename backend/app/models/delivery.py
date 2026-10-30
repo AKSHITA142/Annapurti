@@ -52,3 +52,4 @@ class UtilizationReport(Base):
 
     request = relationship("DonationRequest", back_populates="utilization_reports")
     receiver = relationship("User")
+

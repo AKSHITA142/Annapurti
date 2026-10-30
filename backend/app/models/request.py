@@ -30,3 +30,4 @@ class DonationRequest(Base):
     listing = relationship("FoodListing", back_populates="requests")
     receiver = relationship("User", back_populates="requests")
     utilization_reports = relationship("UtilizationReport", back_populates="request")
+

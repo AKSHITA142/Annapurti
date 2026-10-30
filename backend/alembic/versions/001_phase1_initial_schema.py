@@ -199,3 +199,4 @@ def downgrade() -> None:
     op.drop_table('food_listings')
     op.drop_table('receiver_profiles')
     op.drop_table('users')
+

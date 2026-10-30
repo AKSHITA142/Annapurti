@@ -19,3 +19,4 @@ class DecisionLog(Base):
     )  # INVENTORY_EXHAUSTED, RESERVED_SUCCESS, SAFETY_DEADLINE, CAPACITY, HOURS_CLOSED, CATEGORY_REJECTED, etc.
     message = Column(Text, nullable=False)  # Human-readable sentence
     payload = Column(JSON, default=dict, nullable=False)  # Additional machine-readable structured details
+
