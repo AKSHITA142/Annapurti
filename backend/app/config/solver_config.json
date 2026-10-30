@@ -1,0 +1,18 @@
+{
+  "search": {
+    "max_nodes": 10000,
+    "timeout_seconds": 2.0,
+    "run_ac3_during_search": true
+  },
+  "objective_weights": {
+    "distance_weight": 1.0,
+    "delivery_cost_weight": 0.5,
+    "fairness_penalty_weight": 20.0,
+    "utilization_bonus_weight": 0.2
+  },
+  "costs": {
+    "self_collect_cost_inr": 0.0,
+    "sender_vehicle_cost_per_km_inr": 15.0,
+    "simulated_partner_cost_per_km_inr": 25.0
+  }
+}
