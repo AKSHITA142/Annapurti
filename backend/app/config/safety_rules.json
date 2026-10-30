@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "cooked_hot": {
+      "max_safe_window_minutes": 240,
+      "needs_temperature_control": false,
+      "description": "Cooked food served hot (FSSAI 4-hour safe consumption window)"
+    },
+    "cooked_chilled": {
+      "max_safe_window_minutes": 480,
+      "needs_temperature_control": true,
+      "description": "Cooked food blast chilled, requires active cold storage"
+    },
+    "raw_refrigerated": {
+      "max_safe_window_minutes": 720,
+      "needs_temperature_control": true,
+      "description": "Perishable raw produce/dairy, requires cold storage"
+    },
+    "sealed_packaged": {
+      "max_safe_window_minutes": 10080,
+      "needs_temperature_control": false,
+      "description": "Packaged shelf-stable goods, capped at 7 days (10080 mins)"
+    }
+  },
+  "operational_defaults": {
+    "load_time_minutes": 10,
+    "handover_time_minutes": 5,
+    "speed_kmh": 30.0,
+    "road_curvature_factor": 1.3
+  }
+}
