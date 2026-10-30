@@ -161,3 +161,4 @@ class DistanceMatrix:
                         locations[i], locations[j], traffic_level=level
                     )
         return matrix
+

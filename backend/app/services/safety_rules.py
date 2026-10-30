@@ -165,3 +165,4 @@ class SafetyRulesService:
 
 # Global singleton instance
 safety_service = SafetyRulesService()
+

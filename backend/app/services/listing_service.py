@@ -77,3 +77,4 @@ class ListingService:
         db.commit()
         db.refresh(listing)
         return listing
+
