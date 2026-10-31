@@ -8,7 +8,7 @@ from app.models.listing import FoodListing
 from app.models.user import ReceiverProfile, User
 from app.schemas.listing import ListingCreate, ListingResponse, ListingUpdate, ParseIntakeRequest, ParseIntakeResponse
 from app.services.plain_intake import PlainLanguageIntakeParser
-from app.services.inventory import _ensure_utc
+from app.services.inventory import InventoryService, _ensure_utc
 from app.services.listing_service import ListingService
 from app.services.safety_rules import safety_service
 from app.services.travel import travel_minutes
@@ -127,20 +127,32 @@ def get_listings(
     city: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     status_filter: Optional[str] = Query(None, alias="status"),
+    include_expired: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ) -> List[ListingResponse]:
     """
     Lists listings matching filters with receiver-specific feasibility badges
     ('feasible', 'tight', 'infeasible') and live spoilage countdown minutes.
+    Automatically purges and marks any listings past their safe deadline as 'expired'.
     """
     now = datetime.now(timezone.utc)
+
+    # Automatic Food Safety Purge: Expire any listings past safe deadline and stale reservations
+    InventoryService.expire_spoiled_listings(db, now)
+    InventoryService.expire_stale_reservations(db, now)
+
     query = db.query(FoodListing)
 
     if category:
         query = query.filter(FoodListing.category == category)
+
     if status_filter:
-        query = query.filter(FoodListing.status == status_filter)
+        if status_filter != "all":
+            query = query.filter(FoodListing.status == status_filter)
+    elif not include_expired:
+        # Default: only active safe listings with deadline in the future
+        query = query.filter(FoodListing.status == "active", FoodListing.safe_deadline > now)
 
     listings = query.order_by(FoodListing.created_at.desc()).all()
 
@@ -231,3 +243,16 @@ def update_listing(
     item.journey_slack_minutes = slack
     item.spoilage_minutes_remaining = spoilage
     return item
+
+
+@router.post("/purge-expired")
+def purge_expired_listings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["provider", "admin"])),
+):
+    """
+    Manually triggers an instant scan and purge of any food listing past its safe deadline.
+    """
+    now = datetime.now(timezone.utc)
+    count = InventoryService.expire_spoiled_listings(db, now)
+    return {"status": "success", "expired_count": count, "purged_at": now.isoformat()}

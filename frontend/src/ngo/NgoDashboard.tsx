@@ -85,11 +85,21 @@ export function NgoDashboard() {
     return () => clearInterval(timer)
   }, [])
 
+  const [currentTime, setCurrentTime] = useState<number>(Date.now())
+
+  // 1-second live clock for instant food safety spoilage removal
+  useEffect(() => {
+    const clock = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+    return () => clearInterval(clock)
+  }, [])
+
   function isListingSpoiled(l: FoodListing): boolean {
     if (l.status === 'expired') return true
     if (l.spoilage_minutes_remaining !== undefined && l.spoilage_minutes_remaining <= 0) return true
     const deadline = new Date(l.safe_deadline).getTime()
-    return Date.now() >= deadline
+    return currentTime >= deadline
   }
 
   const safeAvailableListings = listings.filter(
