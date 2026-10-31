@@ -78,6 +78,7 @@ class ListingResponse(BaseModel):
     contribution_amount: float
     status: str
     created_at: datetime
+    provider_name: Optional[str] = None
 
     # Feasibility and countdown badges (dynamic computed fields)
     feasibility_badge: Optional[str] = None  # feasible, tight, infeasible

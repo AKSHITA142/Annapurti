@@ -39,6 +39,7 @@ export interface FoodListing {
   feasibility_badge?: 'feasible' | 'tight' | 'infeasible'
   journey_slack_minutes?: number
   spoilage_minutes_remaining?: number
+  provider_name?: string
 }
 
 export interface DonationRequest {
@@ -47,12 +48,23 @@ export interface DonationRequest {
   receiver_id: number
   requested_lots: number
   allocated_lots: number
-  status: 'pending' | 'reserved' | 'allocated' | 'rejected' | 'cancelled' | 'expired' | 'completed'
+  status: 'pending' | 'reserved' | 'offered' | 'allocated' | 'dispatched' | 'rejected' | 'cancelled' | 'expired' | 'completed'
   reservation_expires_at?: string
   created_at: string
   updated_at: string
   listing_name?: string
   listing_category?: string
+  receiver_name?: string
+  receiver_priority_class?: string
+  delivery_basis?: string
+  partner_verified?: boolean
+  partner_details?: string
+  delivery_job_id?: number
+  delivery_job_status?: string
+  otp_code?: string
+  provider_name?: string
+  nominal_price?: number
+  offer_seconds_remaining?: number
 }
 
 export interface RouteStop {
@@ -203,9 +215,23 @@ export async function login(email: string, name?: string, role: string = 'ngo', 
   } catch (err: any) {
     // If backend is unreachable or offline, provide immediate resilient demo session so user is NEVER blocked
     console.warn('Backend API unreachable, automatically falling back to offline demo session:', err)
+    const getFallbackId = () => {
+      if (role === 'admin') return 9
+      if (role === 'provider') {
+        if (email.includes('taj.skyline')) return 10
+        if (email.includes('taj.caterers')) return 1
+        if (email.includes('iscon')) return 2
+        return 11
+      }
+      if (email.includes('apang')) return 6
+      if (email.includes('bpa')) return 12
+      if (email.includes('shishu')) return 7
+      return 8
+    }
+
     const mockUser: User = {
-      id: role === 'admin' ? 99 : role === 'provider' ? 1 : 2,
-      name: name || (role === 'admin' ? 'City AMC Admin' : role === 'provider' ? 'Taj Skyline Hotel' : 'Apang Manav Mandal'),
+      id: getFallbackId(),
+      name: name || (role === 'admin' ? 'City AMC Operations Admin' : role === 'provider' ? 'Taj Skyline Hotel' : 'Apang Manav Mandal Shelter'),
       email: email,
       role: role as any,
       verified: true,
@@ -271,6 +297,46 @@ export async function createRequest(listingId: number, requestedLots: number) {
 
 export async function getMyRequests() {
   return request<DonationRequest[]>('/requests/mine')
+}
+
+export async function getDonorRequests() {
+  return request<DonationRequest[]>('/requests/donor')
+}
+
+export async function confirmRequest(requestId: number) {
+  return request<DonationRequest>(`/requests/${requestId}/confirm`, {
+    method: 'POST',
+  })
+}
+
+export async function sendDonorOffer(requestId: number) {
+  return request<DonationRequest>(`/requests/${requestId}/donor-offer`, {
+    method: 'POST',
+  })
+}
+
+export async function ngoAcceptOffer(requestId: number) {
+  return request<DonationRequest>(`/requests/${requestId}/ngo-accept`, {
+    method: 'POST',
+  })
+}
+
+export async function dispatchOrder(requestId: number) {
+  return request<DonationRequest>(`/requests/${requestId}/dispatch`, {
+    method: 'POST',
+  })
+}
+
+export async function completeDelivery(requestId: number) {
+  return request<DonationRequest>(`/requests/${requestId}/complete-delivery`, {
+    method: 'POST',
+  })
+}
+
+export async function rejectRequest(requestId: number) {
+  return request<DonationRequest>(`/requests/${requestId}/reject`, {
+    method: 'POST',
+  })
 }
 
 export async function cancelRequest(requestId: number) {

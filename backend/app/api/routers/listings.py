@@ -159,6 +159,10 @@ def get_listings(
         item.feasibility_badge = badge
         item.journey_slack_minutes = slack
         item.spoilage_minutes_remaining = spoilage
+        if l.provider:
+            item.provider_name = l.provider.name
+        else:
+            item.provider_name = "Taj Skyline Hotel"
         results.append(item)
 
     return results

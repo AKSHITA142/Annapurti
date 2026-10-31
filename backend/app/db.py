@@ -24,7 +24,8 @@ try:
         pass
 except Exception as e:
     logger.warning("Primary database (%s) unavailable: %s. Falling back to local SQLite database.", db_url, e)
-    fallback_url = "sqlite:///./foodrescue.db"
+    _default_sqlite_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "foodrescue.db"))
+    fallback_url = f"sqlite:///{_default_sqlite_path}"
     engine = create_db_engine(fallback_url)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

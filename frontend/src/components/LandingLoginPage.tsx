@@ -15,16 +15,20 @@ type DemoAccount = { name: string, email: string, lat: number, lng: number }
 
 const accounts: Record<Role, DemoAccount[]> = {
   provider: [
-    { name: 'Taj Skyline Hotel', email: 'taj.skyline@ahmedabad.com', lat: 23.0035, lng: 72.5015 },
+    { name: 'Taj Skyline Hotel (Banquets & Dining)', email: 'taj.skyline@ahmedabad.com', lat: 23.0035, lng: 72.5015 },
+    { name: 'Grand Taj Caterers & Banquets', email: 'taj.caterers@ahmedabad.com', lat: 23.0225, lng: 72.5714 },
+    { name: 'Iscon Thal Banquets', email: 'iscon.thal@ahmedabad.com', lat: 23.0305, lng: 72.518 },
     { name: 'Courtyard by Marriott', email: 'marriott@ahmedabad.com', lat: 23.0278, lng: 72.5085 },
-    { name: 'Iscon Caterers', email: 'iscon.caterers@ahmedabad.com', lat: 23.0305, lng: 72.518 },
   ],
   ngo: [
-    { name: 'Apang Manav Mandal Orphanage', email: 'apang.mandal@ahmedabad.org', lat: 23.0425, lng: 72.541 },
+    { name: 'Apang Manav Mandal Shelter', email: 'apang.mandal@ahmedabad.org', lat: 23.0425, lng: 72.541 },
     { name: 'Blind People’s Association', email: 'bpa@ahmedabad.org', lat: 23.011, lng: 72.535 },
-    { name: 'Robin Hood Army Ahmedabad', email: 'rha.ahmedabad@volunteer.org', lat: 23.035, lng: 72.525 },
+    { name: 'Shishu Gruh Child Orphanage', email: 'shishu.gruh@ahmedabad.org', lat: 23.055, lng: 72.585 },
+    { name: 'Robin Hood Army Slum Kitchen', email: 'rha.ahmedabad@robinhood.org', lat: 23.035, lng: 72.525 },
   ],
-  admin: [{ name: 'Ahmedabad Municipal Admin', email: 'admin@amc.gov.in', lat: 23.0225, lng: 72.5714 }],
+  admin: [
+    { name: 'City AMC Operations Admin', email: 'admin@amc.gov.in', lat: 23.0225, lng: 72.5714 },
+  ],
 }
 
 export const LandingLoginPage: React.FC<LandingLoginPageProps> = ({ onLoginSuccess, apiOnline }) => {
