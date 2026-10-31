@@ -365,3 +365,4 @@ def test_validator_catches_cold_chain_violation():
     cold_viols = [v for v in res.violations if v.violation_type == "COLD_CHAIN_VIOLATION"]
     assert len(cold_viols) >= 1
     assert 301 in cold_viols[0].request_ids
+

@@ -270,3 +270,4 @@ def brute_force_optimal_route(
     if best_route is not None:
         return best_route, best_time
     return None
+

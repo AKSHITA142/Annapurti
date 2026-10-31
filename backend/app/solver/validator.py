@@ -221,3 +221,4 @@ def validate_route(
         stops_visited=len(route),
         timeline=timeline,
     )
+

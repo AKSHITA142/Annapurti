@@ -376,3 +376,4 @@ class RoutingEngine:
             route, vehicle_capacity, vehicle_has_cold_storage, start_time, start_coord, traffic_level
         )
         return route, validation
+
