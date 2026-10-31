@@ -58,7 +58,7 @@ export function App() {
     setActiveTab('donor')
   }
 
-  // 1. If not authenticated, render the attractive Landing & Login Page
+  // 1. If not authenticated, render the clean light-mode Landing & Login Page
   if (!user) {
     return <LandingLoginPage onLoginSuccess={setUser} apiOnline={apiOnline} />
   }
@@ -69,31 +69,19 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-      {/* Top Header & Navigation Bar */}
-      <header
-        className={`border-b sticky top-0 z-50 shadow-xs transition-colors ${
-          isAdmin
-            ? 'bg-slate-900 text-white border-slate-800'
-            : 'bg-white text-slate-900 border-slate-200'
-        }`}
-      >
+      {/* Top Header & Navigation Bar (Clean Light Mode) */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo & Platform Name */}
           <div className="flex items-center space-x-3">
-            <span
-              className={`text-2xl font-black ${
-                isAdmin
-                  ? 'bg-gradient-to-r from-blue-400 via-teal-300 to-indigo-300 bg-clip-text text-transparent'
-                  : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 bg-clip-text text-transparent'
-              }`}
-            >
-              AnnaPurti
+            <span className="text-2xl font-black tracking-tight text-slate-900">
+              Anna<span className="text-emerald-600">Purti</span>
             </span>
             <span
-              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md ${
+              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md border ${
                 isAdmin
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
-                  : 'bg-emerald-100 text-emerald-800'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
               }`}
             >
               {isAdmin ? 'Admin Operations' : 'FoodRescue-AI'}
@@ -102,16 +90,12 @@ export function App() {
 
           {/* Navigation Tabs — STRICT ROLE ISOLATION:
               Users can NEVER see the Admin Explain View tab! */}
-          <nav
-            className={`hidden md:flex items-center space-x-1 p-1 rounded-xl ${
-              isAdmin ? 'bg-slate-800/80 border border-slate-700/60' : 'bg-slate-100'
-            }`}
-          >
+          <nav className="hidden md:flex items-center space-x-1 p-1 rounded-xl bg-slate-100">
             {/* Donor Tab: ONLY visible if user is a Donor */}
             {isDonor && (
               <button
                 onClick={() => setActiveTab('donor')}
-                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'donor'
                     ? 'bg-white text-emerald-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -126,7 +110,7 @@ export function App() {
             {isNgo && (
               <button
                 onClick={() => setActiveTab('ngo')}
-                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'ngo'
                     ? 'bg-white text-purple-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -142,10 +126,10 @@ export function App() {
             {isAdmin && (
               <button
                 onClick={() => setActiveTab('admin')}
-                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'admin'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Eye className="w-3.5 h-3.5" />
@@ -156,13 +140,9 @@ export function App() {
             {/* Impact Tab: Visible to everyone */}
             <button
               onClick={() => setActiveTab('impact')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'impact'
-                  ? isAdmin
-                    ? 'bg-teal-600 text-white shadow-xs'
-                    : 'bg-white text-teal-700 shadow-xs'
-                  : isAdmin
-                  ? 'text-slate-300 hover:text-white'
+                  ? 'bg-white text-teal-700 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -174,27 +154,23 @@ export function App() {
           {/* User Profile Badge & Logout Control */}
           <div className="flex items-center space-x-3">
             {/* Authenticated User Info */}
-            <div
-              className={`flex items-center space-x-2 px-3 py-1 rounded-xl text-xs ${
-                isAdmin
-                  ? 'bg-slate-800 border border-slate-700 text-slate-200'
-                  : 'bg-slate-100 border border-slate-200 text-slate-700'
-              }`}
-            >
+            <div className="flex items-center space-x-2 px-3 py-1 rounded-xl text-xs bg-slate-50 border border-slate-200 text-slate-700">
               <div
-                className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${
+                className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white ${
                   isAdmin
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600'
                     : isDonor
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-purple-600 text-white'
+                    ? 'bg-emerald-600'
+                    : 'bg-purple-600'
                 }`}
               >
                 {isAdmin ? <ShieldAlert className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
               </div>
               <div className="text-left hidden sm:block">
-                <span className="block font-bold leading-tight truncate max-w-[150px]">{user.name}</span>
-                <span className="block text-[10px] opacity-75 capitalize">
+                <span className="block font-bold leading-tight truncate max-w-[150px] text-slate-900">
+                  {user.name}
+                </span>
+                <span className="block text-[10px] text-slate-500 capitalize">
                   {user.role === 'provider' ? 'Individual Donor' : user.role === 'ngo' ? 'NGO Receiver' : 'City Administrator'}
                 </span>
               </div>
@@ -202,29 +178,21 @@ export function App() {
 
             {/* Health Pulse */}
             <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
-                isAdmin
-                  ? 'bg-slate-800 border-slate-700 text-slate-300'
-                  : 'bg-slate-100 border-slate-200 text-slate-600'
-              }`}
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border bg-slate-50 border-slate-200 text-slate-600"
               title={apiOnline ? 'FastAPI Backend Connected' : 'Connecting to API'}
             >
               <span
                 className={`w-2 h-2 rounded-full ${
-                  apiOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  apiOnline ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
                 }`}
-              ></span>
+              />
               <span className="hidden md:inline">{apiOnline ? 'API 8000' : 'Offline'}</span>
             </div>
 
             {/* Logout Button */}
             <button
               onClick={handleLogout}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                isAdmin
-                  ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30'
-                  : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 border border-slate-200'
-              }`}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 border border-slate-200 cursor-pointer"
               title="Sign Out of Portal"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -234,11 +202,7 @@ export function App() {
         </div>
 
         {/* Mobile Navigation Bar */}
-        <div
-          className={`md:hidden flex border-t px-2 py-1 overflow-x-auto justify-around text-xs ${
-            isAdmin ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
-          }`}
-        >
+        <div className="md:hidden flex border-t border-slate-200 bg-slate-50 px-2 py-1 overflow-x-auto justify-around text-xs">
           {isDonor && (
             <button
               onClick={() => setActiveTab('donor')}
@@ -265,7 +229,7 @@ export function App() {
             <button
               onClick={() => setActiveTab('admin')}
               className={`px-3 py-1.5 rounded-lg font-bold ${
-                activeTab === 'admin' ? 'bg-blue-600 text-white' : 'text-slate-400'
+                activeTab === 'admin' ? 'bg-blue-600 text-white' : 'text-slate-600'
               }`}
             >
               Admin Explain
@@ -275,11 +239,7 @@ export function App() {
           <button
             onClick={() => setActiveTab('impact')}
             className={`px-3 py-1.5 rounded-lg font-bold ${
-              activeTab === 'impact'
-                ? 'bg-teal-600 text-white'
-                : isAdmin
-                ? 'text-slate-400'
-                : 'text-slate-600'
+              activeTab === 'impact' ? 'bg-teal-600 text-white' : 'text-slate-600'
             }`}
           >
             Impact
@@ -296,19 +256,11 @@ export function App() {
         {activeTab === 'impact' && <ImpactDashboard />}
       </main>
 
-      {/* Footer */}
-      <footer
-        className={`border-t py-6 text-center text-xs transition-colors ${
-          isAdmin
-            ? 'bg-slate-950 text-slate-500 border-slate-800'
-            : 'bg-white text-slate-500 border-slate-200'
-        }`}
-      >
+      {/* Clean Light Footer */}
+      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
-            <span className={`font-bold ${isAdmin ? 'text-slate-300' : 'text-slate-700'}`}>
-              FoodRescue-AI (AnnaPurti)
-            </span>
+            <span className="font-bold text-slate-700">FoodRescue-AI (AnnaPurti)</span>
             <span>•</span>
             <span>Constraint Satisfaction Allocation & A* Vehicle Routing Engine</span>
           </div>
