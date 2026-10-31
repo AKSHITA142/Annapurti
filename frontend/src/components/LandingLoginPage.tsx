@@ -136,8 +136,7 @@ export const LandingLoginPage: React.FC<LandingLoginPageProps> = ({ onLoginSucce
 
       <header className="landing-nav">
         <button type="button" className="brand" aria-label="AnnaPurti home" onClick={() => handleNavigation('home')}>
-          <span className="brand-mark"><Leaf /><span className="brand-swoosh" /></span>
-          <span><strong>Anna<span>Purti</span></strong><small>Helping Good Food Reach More People</small></span>
+          <img src="/images/annapurti-logo.png" alt="AnnaPurti — Helping Good Food Reach More People" />
         </button>
         <nav className="nav-links" aria-label="Main navigation">
           <button type="button" className={activeNav === 'home' ? 'active' : ''} aria-current={activeNav === 'home' ? 'page' : undefined} onClick={() => handleNavigation('home')}>Home</button>
