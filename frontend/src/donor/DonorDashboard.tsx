@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
+  ArrowUpRight,
   Clock,
+  ClipboardCheck,
   Layers,
   Plus,
   RefreshCw,
@@ -48,6 +50,9 @@ export function DonorDashboard() {
 
   const activeSafeListings = listings.filter((l) => !isListingSpoiled(l) && l.status === 'active')
   const archiveListings = listings.filter((l) => isListingSpoiled(l) || l.status !== 'active')
+  const availableMeals = activeSafeListings.reduce((total, listing) => total + listing.available_lots * listing.lot_size, 0)
+  const reservedMeals = activeSafeListings.reduce((total, listing) => total + listing.reserved_lots * listing.lot_size, 0)
+  const pendingRequests = donorRequests.filter((request) => request.status === 'pending' || request.status === 'reserved').length
 
   // Plain-language intake state
   const [plainInputText, setPlainInputText] = useState('')
@@ -195,22 +200,24 @@ export function DonorDashboard() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7 pb-4">
       {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 bg-gradient-to-br from-white via-white to-emerald-50/70 p-6 sm:p-7 rounded-3xl border border-emerald-100 shadow-sm">
+        <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-emerald-100/60 blur-2xl pointer-events-none" />
         <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-2xl font-black text-slate-800">Donor Surplus Food Portal</h1>
-            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
+          <div className="flex items-center space-x-2.5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm"><Layers className="h-5 w-5" /></span>
+            <div><h1 className="text-2xl font-black tracking-tight text-slate-800">Donor Surplus Food Portal</h1>
+            <span className="inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
               Provider Mode
-            </span>
+            </span></div>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 mt-3 max-w-2xl">
             Publish surplus meal lots, monitor live perishable food safety deadlines, and dispatch deliveries.
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="relative z-10 flex flex-wrap items-center gap-3">
           <button
             onClick={() => handleTriggerAllocation()}
             className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 text-white hover:bg-slate-900 transition-colors shadow-sm"
@@ -229,6 +236,12 @@ export function DonorDashboard() {
         </div>
       </div>
 
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4" aria-label="Donor inventory summary">
+        <DashboardMetric icon={<Layers className="w-5 h-5" />} label="Safe listings" value={activeSafeListings.length.toString()} detail={activeSafeListings.length === 1 ? 'Ready to share now' : 'Ready to share now'} tone="emerald" />
+        <DashboardMetric icon={<Utensils className="w-5 h-5" />} label="Meals available" value={availableMeals.toLocaleString()} detail={`${reservedMeals.toLocaleString()} meals reserved`} tone="orange" />
+        <DashboardMetric icon={<ClipboardCheck className="w-5 h-5" />} label="Actions needed" value={pendingRequests.toString()} detail={pendingRequests ? 'Claims waiting for review' : 'No outstanding claims'} tone="blue" />
+      </section>
+
       {allocationStatus && (
         <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-sm flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -245,7 +258,7 @@ export function DonorDashboard() {
       )}
 
       {/* Workspace Switcher Tabs: Inventory vs Live Orders */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
         <button
           onClick={() => setWorkspaceTab('inventory')}
           className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -286,10 +299,10 @@ export function DonorDashboard() {
       ) : (
         /* Listings Section */
         <div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div className="flex items-center space-x-2">
-              <Layers className="w-5 h-5 text-emerald-600" />
-              <h2 className="text-lg font-bold text-slate-800">Surplus Food Inventory</h2>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><Layers className="w-4.5 h-4.5" /></span>
+              <div><h2 className="text-lg font-bold text-slate-800">Surplus Food Inventory</h2><p className="text-xs text-slate-500">Monitor availability, safety windows and allocation progress.</p></div>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -377,13 +390,13 @@ export function DonorDashboard() {
             {(listingFilter === 'active' ? activeSafeListings : archiveListings).map((l) => (
               <div
                 key={l.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow"
+                className="group bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-900/5 transition-all"
               >
                 <div>
                   {/* Header */}
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div>
-                      <h3 className="font-bold text-slate-900 text-base">{l.name}</h3>
+                      <h3 className="font-bold leading-snug text-slate-900 text-base group-hover:text-emerald-800 transition-colors">{l.name}</h3>
                       <div className="flex items-center space-x-2 mt-1">
                         <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-700 capitalize">
                           {l.category.replace('_', ' ')}
@@ -414,7 +427,7 @@ export function DonorDashboard() {
                   </div>
 
                   {/* Spoilage Countdown */}
-                  <div className="my-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="my-4 p-3.5 bg-slate-50/90 rounded-2xl border border-slate-100">
                     <div className="text-xs text-slate-500 mb-1 flex items-center justify-between">
                       <span className="font-medium">Perishable Safety Deadline</span>
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -423,7 +436,7 @@ export function DonorDashboard() {
                   </div>
 
                   {/* Lot Inventory Breakdown */}
-                  <div className="space-y-2 text-xs">
+                  <div className="space-y-2.5 text-xs">
                     <div className="flex justify-between text-slate-600">
                       <span>Total Inventory:</span>
                       <span className="font-bold text-slate-800">
@@ -432,7 +445,7 @@ export function DonorDashboard() {
                     </div>
 
                     {/* Visual Inventory Bar */}
-                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex">
+                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex ring-1 ring-inset ring-slate-200/60">
                       <div
                         style={{ width: `${(l.available_lots / l.total_lots) * 100}%` }}
                         className="bg-emerald-500"
@@ -473,16 +486,16 @@ export function DonorDashboard() {
                 </div>
 
                 {/* Actions Footer */}
-                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-xs text-slate-400">
                     ID #{l.id} • {new Date(l.created_at).toLocaleDateString()}
                   </span>
                   <button
                     onClick={() => handleTriggerAllocation(l.id)}
-                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+                    className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Allocate This</span>
+                    <span>Allocate</span><ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -661,4 +674,16 @@ export function DonorDashboard() {
       )}
     </div>
   )
+}
+
+function DashboardMetric({ icon, label, value, detail, tone }: { icon: React.ReactNode, label: string, value: string, detail: string, tone: 'emerald' | 'orange' | 'blue' }) {
+  const toneClasses = {
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    orange: 'bg-orange-50 text-orange-600 border-orange-100',
+    blue: 'bg-blue-50 text-blue-600 border-blue-100',
+  }
+  return <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${toneClasses[tone]}`}>{icon}</span>
+    <div><p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-0.5 text-2xl font-black tracking-tight text-slate-800">{value}</p><p className="text-xs text-slate-500">{detail}</p></div>
+  </article>
 }
