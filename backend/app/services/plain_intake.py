@@ -138,3 +138,4 @@ class PlainLanguageIntakeParser:
             "raw_text": text,
             "confidence": 0.95,
         }
+

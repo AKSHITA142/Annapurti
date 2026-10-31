@@ -175,3 +175,4 @@ def test_qr_payload_generation(client_and_session):
     data = res.json()
     assert "qr_payload" in data
     assert f"fr-handover://job/{job_id}?otp=948201" in data["qr_payload"]
+
