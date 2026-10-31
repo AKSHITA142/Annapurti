@@ -7,6 +7,14 @@ from typing import Any, Dict, List, Optional, Tuple
 DEFAULT_SOLVER_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "solver_config.json"
 
 
+DEFAULT_PRIORITY_WEIGHTS: Dict[str, float] = {
+    "orphanage": 1.5,
+    "shelter": 1.3,
+    "community_kitchen": 1.2,
+    "standard": 1.0,
+}
+
+
 class ObjectiveEvaluator:
     def __init__(self, config_path: Optional[Path] = None) -> None:
         self.config_path = config_path or DEFAULT_SOLVER_CONFIG_PATH
@@ -21,6 +29,7 @@ class ObjectiveEvaluator:
             "sender_vehicle_cost_per_km_inr": 15.0,
             "simulated_partner_cost_per_km_inr": 25.0,
         }
+        self.priority_weights = dict(DEFAULT_PRIORITY_WEIGHTS)
         self._load_config()
 
     def _load_config(self) -> None:
@@ -30,6 +39,7 @@ class ObjectiveEvaluator:
                     data = json.load(f)
                     self.weights.update(data.get("objective_weights", {}))
                     self.costs.update(data.get("costs", {}))
+                    self.priority_weights.update(data.get("priority_weights", {}))
             except Exception:
                 pass
 
@@ -40,22 +50,28 @@ class ObjectiveEvaluator:
         receiver_priorities: Optional[Dict[int, str]] = None,
     ) -> float:
         """
-        Fairness penalty: Variance of served fraction (allocated / requested)
-        among receivers with equal declared priority class.
+        Fairness penalty: Variance of served fraction weighted by receiver priority class
+        (orphanage 1.5 > shelter 1.3 > community_kitchen 1.2 > standard 1.0).
+        Fairness influences tie-breaking utility but NEVER overrides hard safety constraints.
         """
         if not requested_by_receiver:
             return 0.0
 
         fractions: List[float] = []
+        priorities = receiver_priorities or {}
+
         for r_id, req_lots in requested_by_receiver.items():
             if req_lots > 0:
                 alloc_lots = allocated_by_receiver.get(r_id, 0)
-                fractions.append(min(1.0, alloc_lots / req_lots))
+                p_class = priorities.get(r_id, "standard")
+                weight = self.priority_weights.get(p_class, 1.0)
+                # Weighted served fraction
+                served_ratio = min(1.0, alloc_lots / req_lots)
+                fractions.append(served_ratio / weight)
 
         if len(fractions) < 2:
             return 0.0
 
-        # Variance of served fraction
         return statistics.pvariance(fractions)
 
     def compute_weighted_cost(

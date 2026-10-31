@@ -47,13 +47,19 @@ export function SpoilageCountdown({ safeDeadline, compact = false }: SpoilageCou
     )
   }
 
-  // Urgent: < 30 mins
-  if (totalMinutes < 30) {
+  // Red / Urgent: < 1 hour (< 60 mins)
+  if (totalMinutes < 60) {
+    const isPulsing = totalMinutes < 30
     return (
-      <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-700 border border-rose-300 animate-pulse">
+      <span
+        className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-700 border border-rose-300 ${
+          isPulsing ? 'animate-pulse' : ''
+        }`}
+        title="Red threshold: Under 1 hour safe consumption window remaining"
+      >
         <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
         <span>
-          {compact ? '' : 'Urgent: '}
+          {compact ? '' : 'Urgent (<1h): '}
           {timeLeft.hours > 0 ? `${timeLeft.hours}h ` : ''}
           {timeLeft.minutes}m {timeLeft.seconds}s
         </span>
@@ -61,22 +67,28 @@ export function SpoilageCountdown({ safeDeadline, compact = false }: SpoilageCou
     )
   }
 
-  // Tight: 30 - 60 mins
-  if (totalMinutes < 60) {
+  // Amber / Caution: 1 to 2 hours (60 - 120 mins)
+  if (totalMinutes < 120) {
     return (
-      <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-300">
+      <span
+        className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300"
+        title="Amber threshold: 1 to 2 hours remaining"
+      >
         <Clock className="w-3.5 h-3.5 text-amber-600" />
         <span>
-          {compact ? '' : 'Tight: '}
-          {timeLeft.minutes}m {timeLeft.seconds}s
+          {compact ? '' : 'Caution (1-2h): '}
+          {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
         </span>
       </span>
     )
   }
 
-  // Safe: > 60 mins
+  // Green / Safe: Over 2 hours (>= 120 mins)
   return (
-    <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+    <span
+      className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+      title="Green threshold: Safe window over 2 hours"
+    >
       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
       <span>
         {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s

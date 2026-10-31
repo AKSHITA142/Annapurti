@@ -16,6 +16,7 @@ import {
 } from '../api/client'
 import { RouteMap } from '../components/RouteMap'
 import { SimulatedBadge } from '../components/SimulatedBadge'
+import { WhatIfStressTest } from '../components/WhatIfStressTest'
 
 export function AdminExplainView() {
   const [overview, setOverview] = useState<AdminOverview | null>(null)
@@ -201,6 +202,9 @@ export function AdminExplainView() {
           </div>
         )}
       </div>
+
+      {/* Interactive What-If Stress Sweeper */}
+      <WhatIfStressTest />
 
       {/* Main Grid: Leaflet Map & Decision Timeline */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

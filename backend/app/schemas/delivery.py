@@ -14,6 +14,7 @@ class DeliveryJobResponse(BaseModel):
     planned_end_time: Optional[datetime] = None
     status: str
     otp_code: str
+    qr_payload: Optional[str] = None
     created_at: datetime
 
 

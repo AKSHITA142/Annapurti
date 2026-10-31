@@ -4,6 +4,7 @@ import {
   Clock,
   KeyRound,
   Package,
+  QrCode,
   RefreshCw,
   ShieldAlert,
   Truck,
@@ -24,6 +25,7 @@ import {
 import { FeasibilityBadge } from '../components/FeasibilityBadge'
 import { SpoilageCountdown } from '../components/SpoilageCountdown'
 import { SimulatedBadge } from '../components/SimulatedBadge'
+import { QRCodeModal } from '../components/QRCodeModal'
 
 export function NgoDashboard() {
   const [listings, setListings] = useState<FoodListing[]>([])
@@ -41,6 +43,7 @@ export function NgoDashboard() {
 
   // OTP Confirmation modal
   const [selectedJob, setSelectedJob] = useState<DeliveryJob | null>(null)
+  const [qrJob, setQrJob] = useState<DeliveryJob | null>(null)
   const [otpCode, setOtpCode] = useState('')
   const [otpError, setOtpError] = useState<string | null>(null)
   const [confirmingOtp, setConfirmingOtp] = useState(false)
@@ -367,31 +370,51 @@ export function NgoDashboard() {
                     </div>
                   </div>
 
-                  {j.status !== 'delivered' && (
+                  <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => {
-                        setSelectedJob(j)
-                        setOtpCode('')
-                        setOtpError(null)
-                      }}
-                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700"
+                      onClick={() => setQrJob(j)}
+                      className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      title="Show QR Code Handover Pass"
                     >
-                      <KeyRound className="w-3.5 h-3.5" />
-                      <span>Confirm Receipt (OTP)</span>
+                      <QrCode className="w-4 h-4" />
                     </button>
-                  )}
 
-                  {j.status === 'delivered' && (
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
-                      Delivered ✓
-                    </span>
-                  )}
+                    {j.status !== 'delivered' && (
+                      <button
+                        onClick={() => {
+                          setSelectedJob(j)
+                          setOtpCode('')
+                          setOtpError(null)
+                        }}
+                        className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>Confirm Receipt (OTP)</span>
+                      </button>
+                    )}
+
+                    {j.status === 'delivered' && (
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
+                        Delivered ✓
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* QR Code Handover Pass Modal */}
+      {qrJob && (
+        <QRCodeModal
+          jobId={qrJob.id}
+          otpCode={qrJob.otp_code}
+          status={qrJob.status}
+          onClose={() => setQrJob(null)}
+        />
+      )}
 
       {/* Request Lots Modal */}
       {selectedListing && (

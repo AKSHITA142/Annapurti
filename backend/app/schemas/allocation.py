@@ -29,4 +29,5 @@ class AllocationDetailResponse(BaseModel):
     status: str
     route: Dict[str, Any]
     otp_code: str
+    qr_payload: Optional[str] = None
     created_at: datetime

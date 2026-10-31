@@ -19,6 +19,12 @@ from app.services.inventory import InventoryService
 router = APIRouter(prefix="/jobs", tags=["Delivery & Tracking"])
 
 
+def _to_job_response(job: DeliveryJob) -> DeliveryJobResponse:
+    resp = DeliveryJobResponse.model_validate(job)
+    resp.qr_payload = f"fr-handover://job/{job.id}?otp={job.otp_code}"
+    return resp
+
+
 @router.post("/{job_id}/collected", response_model=DeliveryJobResponse)
 def mark_job_collected(
     job_id: int,
@@ -40,7 +46,7 @@ def mark_job_collected(
 
     db.commit()
     db.refresh(job)
-    return DeliveryJobResponse.model_validate(job)
+    return _to_job_response(job)
 
 
 @router.post("/{job_id}/delivered", response_model=DeliveryConfirmationResponse)
@@ -123,7 +129,7 @@ def get_job(
     job = db.query(DeliveryJob).filter(DeliveryJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail=f"Delivery job {job_id} not found")
-    return DeliveryJobResponse.model_validate(job)
+    return _to_job_response(job)
 
 
 @router.get("", response_model=List[DeliveryJobResponse])
@@ -133,5 +139,5 @@ def get_my_jobs(
 ) -> List[DeliveryJobResponse]:
     """Lists recent delivery jobs."""
     jobs = db.query(DeliveryJob).order_by(DeliveryJob.created_at.desc()).limit(30).all()
-    return [DeliveryJobResponse.model_validate(j) for j in jobs]
+    return [_to_job_response(j) for j in jobs]
 

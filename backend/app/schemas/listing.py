@@ -3,6 +3,27 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ParseIntakeRequest(BaseModel):
+    text: str
+
+
+class ParseIntakeResponse(BaseModel):
+    name: str
+    category: str
+    veg: bool
+    unit: str
+    lot_size: int
+    total_lots: int
+    estimated_meals: int
+    prepared_at: str
+    pickup_window_start: str
+    pickup_window_end: str
+    sender_declared_window_minutes: int
+    storage_requirement: str
+    raw_text: str
+    confidence: float
+
+
 class ListingCreate(BaseModel):
     name: str
     category: str  # cooked_hot, cooked_chilled, raw_refrigerated, sealed_packaged

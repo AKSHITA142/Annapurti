@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db, get_optional_current_user, require_roles
 from app.models.listing import FoodListing
 from app.models.user import ReceiverProfile, User
-from app.schemas.listing import ListingCreate, ListingResponse, ListingUpdate
+from app.schemas.listing import ListingCreate, ListingResponse, ListingUpdate, ParseIntakeRequest, ParseIntakeResponse
+from app.services.plain_intake import PlainLanguageIntakeParser
 from app.services.inventory import _ensure_utc
 from app.services.listing_service import ListingService
 from app.services.safety_rules import safety_service
@@ -69,6 +70,19 @@ def _compute_badge_and_slack(
     else:
         badge = "feasible"
     return badge, round(spoilage_remaining, 1), round(spoilage_remaining, 1)
+
+
+@router.post("/parse-intake", response_model=ParseIntakeResponse)
+def parse_plain_language_intake(
+    payload: ParseIntakeRequest,
+    current_user: User = Depends(require_roles(["provider", "admin"])),
+) -> ParseIntakeResponse:
+    """
+    Parses plain-language donor input (e.g. '50 veg biryani boxes made at 1 pm, pickup till 4')
+    into structured listing parameters. The donor reviews and confirms before publishing.
+    """
+    parsed = PlainLanguageIntakeParser.parse(payload.text)
+    return ParseIntakeResponse(**parsed)
 
 
 @router.post("", response_model=ListingResponse, status_code=status.HTTP_201_CREATED)

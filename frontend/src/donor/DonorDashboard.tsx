@@ -24,6 +24,11 @@ export function DonorDashboard() {
   const [submitting, setSubmitting] = useState(false)
   const [allocationStatus, setAllocationStatus] = useState<string | null>(null)
 
+  // Plain-language intake state
+  const [plainInputText, setPlainInputText] = useState('')
+  const [parsingIntake, setParsingIntake] = useState(false)
+  const [intakeParsedNote, setIntakeParsedNote] = useState<string | null>(null)
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -53,6 +58,48 @@ export function DonorDashboard() {
   useEffect(() => {
     loadData()
   }, [])
+
+  async function handleParseIntake() {
+    if (!plainInputText.trim()) return
+    setParsingIntake(true)
+    setIntakeParsedNote(null)
+
+    try {
+      const token = localStorage.getItem('foodrescue_token')
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+      const res = await fetch(`${API_BASE_URL}/listings/parse-intake`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text: plainInputText }),
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to parse intake text')
+      }
+
+      const data = await res.json()
+      setFormData((prev) => ({
+        ...prev,
+        name: data.name,
+        category: data.category,
+        veg: data.veg,
+        lot_size: data.lot_size,
+        total_lots: data.total_lots,
+        sender_declared_window_minutes: data.sender_declared_window_minutes,
+        storage_requirement: data.storage_requirement,
+      }))
+      setIntakeParsedNote(
+        `Parsed successfully: ${data.name} (${data.total_lots} lots, ${data.category}, ${data.veg ? 'Veg' : 'Non-veg'}). Please review parameters below before publishing.`
+      )
+    } catch (err: any) {
+      alert(`Could not parse text: ${err.message}`)
+    } finally {
+      setParsingIntake(false)
+    }
+  }
 
   async function handleCreateListing(e: React.FormEvent) {
     e.preventDefault()
@@ -329,6 +376,44 @@ export function DonorDashboard() {
               >
                 ✕
               </button>
+            </div>
+
+            {/* Plain-Language Smart Intake Assistant */}
+            <div className="mb-6 p-4 rounded-2xl bg-indigo-50 border border-indigo-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                  Plain-Language Quick Intake
+                </label>
+                <span className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded-full border border-indigo-200">
+                  NLP Parser
+                </span>
+              </div>
+              <p className="text-[11px] text-indigo-800 mb-2">
+                Type in natural words: e.g. <span className="italic">"50 veg biryani boxes made at 1 pm, pickup till 4"</span>
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. 50 veg biryani boxes made at 1 pm, pickup till 4"
+                  value={plainInputText}
+                  onChange={(e) => setPlainInputText(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleParseIntake}
+                  disabled={parsingIntake || !plainInputText.trim()}
+                  className="px-3.5 py-2 text-xs font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors shrink-0"
+                >
+                  {parsingIntake ? 'Parsing...' : 'Smart Parse'}
+                </button>
+              </div>
+
+              {intakeParsedNote && (
+                <div className="mt-2.5 p-2 rounded-lg bg-emerald-100 text-emerald-900 text-[11px] font-medium border border-emerald-300">
+                  {intakeParsedNote}
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleCreateListing} className="space-y-4">
