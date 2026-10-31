@@ -18,6 +18,12 @@ app = FastAPI(
 def startup_db():
     try:
         Base.metadata.create_all(bind=engine)
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE users ADD COLUMN address VARCHAR(500)"))
+                conn.commit()
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -78,15 +84,15 @@ def health_check() -> Dict[str, Any]:
     """Health check endpoint checking application and database status."""
     db_status = "unreachable"
     try:
-        db = SessionLocal()
-        db.execute(text("SELECT 1"))
-        db.close()
-        db_status = "connected"
+        session = SessionLocal()
+        session.execute(text("SELECT 1"))
+        session.close()
+        db_status = "healthy"
     except Exception as e:
-        db_status = f"disconnected: {str(e)}"
+        db_status = f"unhealthy: {str(e)}"
 
     return {
-        "status": "ok",
+        "status": "online",
         "app": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
@@ -94,10 +100,13 @@ def health_check() -> Dict[str, Any]:
     }
 
 
-@app.get("/")
-def root() -> Dict[str, str]:
+@app.get("/", tags=["Root"])
+def root() -> Dict[str, Any]:
+    """Root endpoint providing service metadata."""
     return {
-        "message": f"Welcome to {settings.PROJECT_NAME} API. Visit /docs for documentation.",
-        "health": "/health",
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION,
         "docs": "/docs",
+        "health": "/health",
+        "description": "FoodRescue-AI optimization and redistribution platform",
     }

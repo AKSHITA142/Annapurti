@@ -2,7 +2,10 @@ export interface User {
   id: number
   name: string
   email: string
-  role: 'provider' | 'ngo' | 'volunteer' | 'admin'
+  phone?: string
+  organization?: string
+  address?: string
+  role: 'provider' | 'ngo' | 'volunteer' | 'admin' | 'both'
   verified: boolean
   city: string
   lat?: number
@@ -171,6 +174,13 @@ export function getCurrentUser(): User | null {
   return currentUser
 }
 
+export function updateCurrentUser(updates: Partial<User>): User | null {
+  if (!currentUser) return null
+  currentUser = { ...currentUser, ...updates }
+  localStorage.setItem('foodrescue_user', JSON.stringify(currentUser))
+  return currentUser
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {})
   headers.set('Content-Type', 'application/json')
@@ -204,12 +214,24 @@ export async function fetchHealth() {
   return request<{ status: string; app: string; version: string; environment: string; database: string }>('/health')
 }
 
-export async function login(email: string, name?: string, role: string = 'ngo', lat: number = 23.0225, lng: number = 72.5714) {
+export async function login(
+  email: string,
+  name?: string,
+  role: string = 'ngo',
+  lat: number = 23.0225,
+  lng: number = 72.5714,
+  phone?: string,
+  organization?: string,
+  address?: string
+) {
   try {
     const data = await request<{ access_token: string; token_type: string; user: User }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, name, role, lat, lng, city: 'Ahmedabad' }),
+      body: JSON.stringify({ email, name, role, lat, lng, city: 'Ahmedabad', address }),
     })
+    if (phone) data.user.phone = phone
+    if (organization) data.user.organization = organization
+    if (address && !data.user.address) data.user.address = address
     setSession(data.access_token, data.user)
     return data
   } catch (err: any) {
@@ -217,6 +239,7 @@ export async function login(email: string, name?: string, role: string = 'ngo', 
     console.warn('Backend API unreachable, automatically falling back to offline demo session:', err)
     const getFallbackId = () => {
       if (role === 'admin') return 9
+      if (role === 'both') return 15
       if (role === 'provider') {
         if (email.includes('taj.skyline')) return 10
         if (email.includes('taj.caterers')) return 1
@@ -231,8 +254,11 @@ export async function login(email: string, name?: string, role: string = 'ngo', 
 
     const mockUser: User = {
       id: getFallbackId(),
-      name: name || (role === 'admin' ? 'City AMC Operations Admin' : role === 'provider' ? 'Taj Skyline Hotel' : 'Apang Manav Mandal Shelter'),
+      name: name || (role === 'admin' ? 'City AMC Operations Admin' : role === 'provider' ? 'Taj Skyline Hotel' : role === 'both' ? 'Community Kitchen & Shelter' : 'Apang Manav Mandal Shelter'),
       email: email,
+      phone: phone || '+91 98765 43210',
+      organization: organization || name || 'Community Partner',
+      address: address || 'Sindhu Bhavan Road, Bodakdev, Ahmedabad, Gujarat 380054',
       role: role as any,
       verified: true,
       city: 'Ahmedabad',
@@ -247,6 +273,27 @@ export async function login(email: string, name?: string, role: string = 'ngo', 
     }
     setSession(fallbackData.access_token, fallbackData.user)
     return fallbackData
+  }
+}
+
+export async function updateProfileApi(updates: {
+  name?: string
+  address?: string
+  lat?: number
+  lng?: number
+  city?: string
+}): Promise<User | null> {
+  try {
+    const updatedUser = await request<User>('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    })
+    updateCurrentUser(updatedUser)
+    return updatedUser
+  } catch (err) {
+    console.warn('Backend update failed or offline, updating local session:', err)
+    const local = updateCurrentUser(updates)
+    return local
   }
 }
 

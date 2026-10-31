@@ -152,6 +152,9 @@ def require_roles(allowed_roles: List[str]):
     """Role-based authorization dependency guard."""
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
+            # Users with 'both' role are authorized for provider and receiver endpoints
+            if current_user.role == "both" and any(r in allowed_roles for r in ("provider", "ngo", "volunteer")):
+                return current_user
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied: requires one of {allowed_roles}, but user is '{current_user.role}'",
@@ -159,4 +162,3 @@ def require_roles(allowed_roles: List[str]):
         return current_user
 
     return role_checker
-
