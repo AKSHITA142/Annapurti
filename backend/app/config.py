@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ]
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    SECRET_KEY: str = "foodrescue-ai-super-secret-key-2026-ahmedabad"
+    TOKEN_EXPIRE_HOURS: int = 72
 
     model_config = SettingsConfigDict(
         env_file=".env",

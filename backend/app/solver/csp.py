@@ -144,9 +144,10 @@ class CSPSolver:
 
             options: List[DomainOption] = []
 
-            # 1. Discretized lot multiples: up to requested_lots and available_lots
+            # 1. Discretized lot multiples: up to requested_lots and available/reserved lots
             lot_size = listing.lot_size or 10
-            max_lots = min(req.requested_lots, listing.available_lots)
+            allocatable_lots = (listing.available_lots or 0) + (getattr(listing, "reserved_lots", 0) or 0)
+            max_lots = min(req.requested_lots, allocatable_lots)
             if max_lots <= 0:
                 self.log_decision(
                     entity_type="request",
@@ -375,8 +376,10 @@ class CSPSolver:
         # Binary constraint 1: Same listing capacity
         if opt_i.listing_id == opt_j.listing_id:
             listing = listings.get(opt_i.listing_id)
-            if listing and (opt_i.lots + opt_j.lots > listing.available_lots):
-                return False
+            if listing:
+                allocatable_capacity = (listing.available_lots or 0) + (getattr(listing, "reserved_lots", 0) or 0)
+                if opt_i.lots + opt_j.lots > allocatable_capacity:
+                    return False
 
         # Binary constraint 2: Same vehicle capacity
         if opt_i.vehicle_id is not None and opt_i.vehicle_id == opt_j.vehicle_id:
@@ -464,12 +467,13 @@ class CSPSolver:
         # 1. Listing capacity running total
         listing = listings.get(val.listing_id)
         if listing:
+            allocatable_capacity = (listing.available_lots or 0) + (getattr(listing, "reserved_lots", 0) or 0)
             current_listing_lots = sum(
                 opt.lots
                 for v_id, opt in assignment.items()
                 if not opt.is_unallocated and opt.listing_id == val.listing_id
             )
-            if current_listing_lots + val.lots > listing.available_lots:
+            if current_listing_lots + val.lots > allocatable_capacity:
                 return False
 
         # 2. Receiver profile intake capacity running total
