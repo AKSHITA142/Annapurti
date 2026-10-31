@@ -18,6 +18,7 @@ import {
   getDonorRequests,
   runAllocation,
   AllocationRunResponse,
+  getCurrentUser,
 } from '../api/client'
 import { SpoilageCountdown } from '../components/SpoilageCountdown'
 import { DonorOrdersManagementPanel } from '../components/DonorOrdersManagementPanel'
@@ -59,6 +60,8 @@ export function DonorDashboard() {
   const [parsingIntake, setParsingIntake] = useState(false)
   const [intakeParsedNote, setIntakeParsedNote] = useState<string | null>(null)
 
+  const currentUser = getCurrentUser()
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -66,8 +69,8 @@ export function DonorDashboard() {
     veg: true,
     lot_size: 10,
     total_lots: 5,
-    pickup_lat: 23.0225,
-    pickup_lng: 72.5714,
+    pickup_lat: currentUser?.lat || 23.0225,
+    pickup_lng: currentUser?.lng || 72.5714,
     sender_declared_window_minutes: 240,
     storage_requirement: 'ambient',
     delivery_mode_offered: 'sender_vehicle',
@@ -91,6 +94,22 @@ export function DonorDashboard() {
 
   useEffect(() => {
     loadData()
+
+    // Real-time synchronization listener across tabs/components
+    const handleSync = () => {
+      loadData()
+    }
+    window.addEventListener('foodrescue:sync_listings', handleSync)
+
+    // Polling interval for live sync across active devices (every 3 seconds)
+    const interval = setInterval(() => {
+      loadData()
+    }, 3000)
+
+    return () => {
+      window.removeEventListener('foodrescue:sync_listings', handleSync)
+      clearInterval(interval)
+    }
   }, [])
 
   async function handleParseIntake() {
@@ -143,6 +162,8 @@ export function DonorDashboard() {
       const pickupStart = new Date(now.getTime() + 10 * 60000)
       const pickupEnd = new Date(now.getTime() + 120 * 60000)
 
+      const activeUser = getCurrentUser()
+
       await createListing({
         name: formData.name,
         category: formData.category,
@@ -150,8 +171,8 @@ export function DonorDashboard() {
         lot_size: Number(formData.lot_size),
         total_lots: Number(formData.total_lots),
         prepared_at: now.toISOString(),
-        pickup_lat: formData.pickup_lat,
-        pickup_lng: formData.pickup_lng,
+        pickup_lat: formData.pickup_lat || activeUser?.lat || 23.0225,
+        pickup_lng: formData.pickup_lng || activeUser?.lng || 72.5714,
         pickup_window_start: pickupStart.toISOString(),
         pickup_window_end: pickupEnd.toISOString(),
         sender_declared_window_minutes: Number(formData.sender_declared_window_minutes),
@@ -166,12 +187,15 @@ export function DonorDashboard() {
         veg: true,
         lot_size: 10,
         total_lots: 5,
-        pickup_lat: 23.0225,
-        pickup_lng: 72.5714,
+        pickup_lat: activeUser?.lat || 23.0225,
+        pickup_lng: activeUser?.lng || 72.5714,
         sender_declared_window_minutes: 240,
         storage_requirement: 'ambient',
         delivery_mode_offered: 'sender_vehicle',
       })
+
+      // Dispatch global sync event to instantly update NGO marketplace and other views
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       await loadData()
     } catch (err: any) {
       alert(`Error creating listing: ${err.message}`)
@@ -193,10 +217,22 @@ export function DonorDashboard() {
           `Allocation finished with partial feasibility. Repaired rounds: ${result.repair_rounds_run}. Check Admin Explain View.`
         )
       }
+      // Real-time synchronization
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       await loadData()
     } catch (err: any) {
       setAllocationStatus(`Allocation error: ${err.message}`)
     }
+  }
+
+  function openCreateModalWithLatestCoords() {
+    const activeUser = getCurrentUser()
+    setFormData((prev) => ({
+      ...prev,
+      pickup_lat: activeUser?.lat || prev.pickup_lat,
+      pickup_lng: activeUser?.lng || prev.pickup_lng,
+    }))
+    setShowCreateModal(true)
   }
 
   return (
@@ -227,7 +263,7 @@ export function DonorDashboard() {
           </button>
 
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={openCreateModalWithLatestCoords}
             className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -376,7 +412,7 @@ export function DonorDashboard() {
               </p>
               {listingFilter === 'active' && (
                 <button
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={openCreateModalWithLatestCoords}
                   className="mt-4 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 cursor-pointer"
                 >
                   Post Surplus Food

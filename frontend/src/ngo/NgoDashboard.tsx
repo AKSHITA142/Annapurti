@@ -16,6 +16,7 @@ import {
   X,
   MessageSquare,
   Camera,
+  MapPin,
 } from 'lucide-react'
 import {
   DonationRequest,
@@ -132,10 +133,22 @@ export function NgoDashboard() {
 
   useEffect(() => {
     loadData()
+
+    // Real-time synchronization listener across tabs/components
+    const handleSync = () => {
+      loadData()
+    }
+    window.addEventListener('foodrescue:sync_listings', handleSync)
+
+    // Live inventory polling (every 3 seconds)
     const interval = setInterval(() => {
       loadData()
-    }, 4000)
-    return () => clearInterval(interval)
+    }, 3000)
+
+    return () => {
+      window.removeEventListener('foodrescue:sync_listings', handleSync)
+      clearInterval(interval)
+    }
   }, [categoryFilter])
 
   // Active incoming 60s offer from donor
@@ -184,6 +197,7 @@ export function NgoDashboard() {
 
     try {
       await createRequest(selectedListing.id, requestedLots)
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       setRequestSuccess(
         `✅ Request sent to ${selectedListing.provider_name || 'Restaurant'}! Restaurant is calculating food safety and route feasibility...`
       )
@@ -541,86 +555,145 @@ export function NgoDashboard() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {safeAvailableListings.map((l) => (
-              <div
-                key={l.id}
-                className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-              >
-                <div>
-                  {/* Restaurant Header */}
-                  <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
-                        <Building2 className="w-4 h-4" />
-                      </div>
-                      <span className="font-extrabold text-xs text-slate-900">
-                        {l.provider_name || 'Taj Skyline Hotel'}
-                      </span>
-                    </div>
-                    <FeasibilityBadge
-                      badge={l.feasibility_badge}
-                      slackMinutes={l.journey_slack_minutes}
-                    />
-                  </div>
+            {safeAvailableListings.map((l) => {
+              const prepTime = l.prepared_at
+                ? new Date(l.prepared_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : 'Recent'
+              const deadlineClock = l.safe_deadline
+                ? new Date(l.safe_deadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : ''
+              const pctRemaining = Math.max(0, Math.min(100, (l.available_lots / (l.total_lots || 1)) * 100))
 
-                  {/* Food Name & Category */}
-                  <h3 className="font-black text-slate-900 text-base leading-snug">{l.name}</h3>
-                  <div className="flex items-center space-x-1.5 text-xs text-slate-500 mt-1">
-                    <span className="capitalize font-medium">{l.category.replace('_', ' ')}</span>
-                    <span>•</span>
-                    <span>{l.lot_size} meals/lot</span>
-                  </div>
-
-                  {/* Spoilage Countdown Clock */}
-                  <div className="my-3.5 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div className="text-[11px] text-slate-500 mb-1 flex items-center justify-between">
-                      <span>Perishable Safety Window</span>
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    </div>
-                    <SpoilageCountdown safeDeadline={l.safe_deadline} />
-                  </div>
-
-                  {/* Available Quantity & Nominal Helping Fee Info */}
-                  <div className="bg-purple-50/50 p-3 rounded-2xl border border-purple-100 text-xs space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">Available:</span>
-                      <span className="font-bold text-purple-900">
-                        {l.available_lots} lots ({l.available_lots * l.lot_size} meals)
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">Helping Contribution:</span>
-                      <span className="font-bold text-emerald-700">~₹50 token fee</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Big Request Button */}
-                <button
-                  disabled={l.available_lots <= 0 || l.feasibility_badge === 'infeasible'}
-                  onClick={() => {
-                    setSelectedListing(l)
-                    setRequestedLots(Math.min(2, l.available_lots))
-                    setRequestError(null)
-                    setRequestSuccess(null)
-                  }}
-                  className={`w-full py-3 px-4 rounded-2xl text-xs font-extrabold flex items-center justify-center space-x-2 transition-all shadow-xs ${
-                    l.available_lots > 0 && l.feasibility_badge !== 'infeasible'
-                      ? 'bg-purple-600 text-white hover:bg-purple-700 cursor-pointer'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
+              return (
+                <div
+                  key={l.id}
+                  className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>
-                    {l.available_lots <= 0
-                      ? 'Exhausted'
-                      : l.feasibility_badge === 'infeasible'
-                      ? 'Infeasible (Deadline Miss)'
-                      : `Request Food from ${l.provider_name ? l.provider_name.split(' ')[0] : 'Restaurant'}`}
-                  </span>
-                </button>
-              </div>
-            ))}
+                  <div>
+                    {/* Restaurant & Feasibility Header */}
+                    <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                          <Building2 className="w-4 h-4" />
+                        </div>
+                        <span className="font-extrabold text-xs text-slate-900">
+                          {l.provider_name || 'Taj Skyline Hotel'}
+                        </span>
+                      </div>
+                      <FeasibilityBadge
+                        badge={l.feasibility_badge}
+                        slackMinutes={l.journey_slack_minutes}
+                      />
+                    </div>
+
+                    {/* Food Name & Veg/Non-Veg & Category Badges */}
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-black text-slate-900 text-base leading-snug">{l.name}</h3>
+                      {l.veg ? (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Pure Veg
+                        </span>
+                      ) : (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
+                          Non-Veg
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
+                      <span className="capitalize font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                        {l.category.replace('_', ' ')}
+                      </span>
+                      <span>•</span>
+                      <span>{l.lot_size} meals/lot</span>
+                    </div>
+
+                    {/* Spoilage Countdown & Deadline Details */}
+                    <div className="my-3.5 p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                      <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                        <span className="font-semibold">Safe Handling Window</span>
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      <SpoilageCountdown safeDeadline={l.safe_deadline} />
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
+                        <span>Prepared: <strong className="text-slate-700">{prepTime}</strong></span>
+                        <span>Deadline: <strong className="text-rose-700">{deadlineClock}</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Quantity Tracking & Logistics Parameters */}
+                    <div className="bg-purple-50/50 p-3.5 rounded-2xl border border-purple-100 text-xs space-y-2.5">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-slate-600 font-medium">Available Quantity:</span>
+                          <span className="font-extrabold text-purple-900">
+                            {l.available_lots} of {l.total_lots} lots ({l.available_lots * l.lot_size} meals)
+                          </span>
+                        </div>
+                        {/* Mini Availability Bar */}
+                        <div className="w-full h-2 bg-slate-200/70 rounded-full overflow-hidden">
+                          <div
+                            style={{ width: `${pctRemaining}%` }}
+                            className={`h-full transition-all duration-300 ${
+                              pctRemaining > 40 ? 'bg-purple-600' : pctRemaining > 15 ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-purple-100">
+                        <div className="flex items-center space-x-1 text-slate-600">
+                          <MapPin className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                          <span className="font-medium">Pickup Node:</span>
+                        </div>
+                        <span className="font-semibold text-slate-800">
+                          {l.pickup_lat?.toFixed(3)}, {l.pickup_lng?.toFixed(3)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-600">Delivery Mode:</span>
+                        <span className="font-semibold text-slate-800 capitalize">
+                          {l.delivery_mode_offered?.replace('_', ' ') || 'Sender Vehicle'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-600">Helping Contribution:</span>
+                        <span className="font-bold text-emerald-700">
+                          {l.contribution_amount ? `~₹${l.contribution_amount} token fee` : '~₹50 token fee'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Big Request Button */}
+                  <button
+                    disabled={l.available_lots <= 0 || l.feasibility_badge === 'infeasible'}
+                    onClick={() => {
+                      setSelectedListing(l)
+                      setRequestedLots(Math.min(2, l.available_lots))
+                      setRequestError(null)
+                      setRequestSuccess(null)
+                    }}
+                    className={`w-full py-3 px-4 rounded-2xl text-xs font-extrabold flex items-center justify-center space-x-2 transition-all shadow-xs ${
+                      l.available_lots > 0 && l.feasibility_badge !== 'infeasible'
+                        ? 'bg-purple-600 text-white hover:bg-purple-700 cursor-pointer'
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>
+                      {l.available_lots <= 0
+                        ? 'Exhausted (0 Lots Remaining)'
+                        : l.feasibility_badge === 'infeasible'
+                        ? 'Infeasible (Safety Deadline Miss)'
+                        : `Request Food from ${l.provider_name ? l.provider_name.split(' ')[0] : 'Restaurant'}`}
+                    </span>
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

@@ -329,17 +329,25 @@ export async function createListing(payload: {
   storage_requirement?: string
   delivery_mode_offered?: string
 }) {
-  return request<FoodListing>('/listings', {
+  const result = await request<FoodListing>('/listings', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('foodrescue:sync_listings', { detail: result }))
+  }
+  return result
 }
 
 export async function createRequest(listingId: number, requestedLots: number) {
-  return request<DonationRequest>('/requests', {
+  const result = await request<DonationRequest>('/requests', {
     method: 'POST',
     body: JSON.stringify({ listing_id: listingId, requested_lots: requestedLots }),
   })
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('foodrescue:sync_listings', { detail: result }))
+  }
+  return result
 }
 
 export async function getMyRequests() {
