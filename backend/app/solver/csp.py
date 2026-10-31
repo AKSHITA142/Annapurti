@@ -245,7 +245,7 @@ class CSPSolver:
 
                     # Unary Constraint 4: Vehicle service radius (for sender vehicles)
                     dist_km = haversine_distance_km(pickup_coord, receiver_coord)
-                    if mode == "sender_vehicle" and veh is not None:
+                    if mode == "sender_vehicle" and veh is not None and veh.service_radius_km is not None:
                         if dist_km > veh.service_radius_km:
                             self.log_decision(
                                 entity_type="request",

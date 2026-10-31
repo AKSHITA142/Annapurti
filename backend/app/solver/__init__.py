@@ -6,6 +6,7 @@ from app.solver.explain import ExplainService
 from app.solver.validator import RouteStop, RouteViolation, RouteValidationResult, validate_route
 from app.solver.astar import graph_astar, RouteStateAStar, brute_force_optimal_route
 from app.solver.routing import RoutingEngine
+from app.solver.feedback_loop import FeedbackLoopCoordinator, FeedbackLoopResult
 
 __all__ = [
     "CSPSolver",
@@ -24,4 +25,6 @@ __all__ = [
     "RouteStateAStar",
     "brute_force_optimal_route",
     "RoutingEngine",
+    "FeedbackLoopCoordinator",
+    "FeedbackLoopResult",
 ]
