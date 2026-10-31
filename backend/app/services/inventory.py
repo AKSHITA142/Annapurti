@@ -415,3 +415,57 @@ class InventoryService:
                         expired_count += 1
 
             return expired_count
+
+    @staticmethod
+    def expire_spoiled_listings(db: Session, now: Optional[datetime] = None) -> int:
+        """
+        Scans all active/fully_reserved listings; if now >= safe_deadline, marks status as 'expired',
+        closes remaining available lots, cancels pending unallocated requests, and persists audit logs.
+        Returns the number of expired listings processed.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+        now_utc = _ensure_utc(now)
+
+        with _inventory_lock:
+            active_listings = (
+                db.query(FoodListing)
+                .filter(FoodListing.status.in_(["active", "fully_reserved"]))
+                .all()
+            )
+            expired_count = 0
+            for l in active_listings:
+                if _ensure_utc(l.safe_deadline) <= now_utc:
+                    unallocated = l.available_lots
+                    l.closed_lots += unallocated
+                    l.available_lots = 0
+                    l.status = "expired"
+                    expired_count += 1
+
+                    # Cancel any pending unallocated claims for this expired batch
+                    pending_reqs = (
+                        db.query(DonationRequest)
+                        .filter(
+                            DonationRequest.listing_id == l.id,
+                            DonationRequest.status.in_(["pending", "reserved", "offered"]),
+                        )
+                        .all()
+                    )
+                    for pr in pending_reqs:
+                        pr.status = "cancelled"
+
+                    db.add(
+                        DecisionLog(
+                            entity_type="listing",
+                            entity_id=l.id,
+                            step="inventory",
+                            decision="expire",
+                            reason_code="SAFETY_DEADLINE_EXPIRED",
+                            message=f"Listing {l.id} ({l.name}) automatically purged past safety deadline ({l.safe_deadline}). Available lots moved to closed.",
+                            payload={"listing_id": l.id, "closed_lots": unallocated},
+                        )
+                    )
+
+            if expired_count > 0:
+                db.commit()
+            return expired_count

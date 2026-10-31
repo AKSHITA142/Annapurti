@@ -1,207 +1,275 @@
 import { useEffect, useState } from 'react'
-import { fetchHealth, HealthResponse } from './api/client'
+import {
+  BarChart3,
+  Eye,
+  HeartHandshake,
+  Utensils,
+  LogOut,
+  ShieldAlert,
+  Building2,
+} from 'lucide-react'
+import {
+  clearSession,
+  fetchHealth,
+  getCurrentUser,
+  User,
+} from './api/client'
+import { DonorDashboard } from './donor/DonorDashboard'
+import { NgoDashboard } from './ngo/NgoDashboard'
+import { AdminExplainView } from './admin/AdminExplainView'
+import { ImpactDashboard } from './components/ImpactDashboard'
+import { LandingLoginPage } from './components/LandingLoginPage'
 
-function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
+type ActiveTab = 'donor' | 'ngo' | 'admin' | 'impact'
+
+export function App() {
+  const [user, setUser] = useState<User | null>(getCurrentUser())
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null)
+
+  // Determine initial active tab based on role
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    const current = getCurrentUser()
+    if (current?.role === 'admin') return 'admin'
+    if (current?.role === 'ngo' || current?.role === 'volunteer') return 'ngo'
+    return 'donor'
+  })
 
   useEffect(() => {
+    // Check backend health
     fetchHealth()
-      .then((data) => {
-        setHealth(data)
-        setLoading(false)
-      })
-      .catch((err) => {
-        setError(err.message || 'Failed to connect to backend API')
-        setLoading(false)
-      })
+      .then(() => setApiOnline(true))
+      .catch(() => setApiOnline(false))
   }, [])
 
+  // Whenever user changes, ensure active tab matches their allowed permissions
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      setActiveTab('admin')
+    } else if (user?.role === 'ngo' || user?.role === 'volunteer') {
+      setActiveTab('ngo')
+    } else if (user?.role === 'provider') {
+      setActiveTab('donor')
+    }
+  }, [user])
+
+  function handleLogout() {
+    clearSession()
+    setUser(null)
+    setActiveTab('donor')
+  }
+
+  // 1. If not authenticated, render the clean light-mode Landing & Login Page
+  if (!user) {
+    return <LandingLoginPage onLoginSuccess={setUser} apiOnline={apiOnline} />
+  }
+
+  const isAdmin = user.role === 'admin'
+  const isDonor = user.role === 'provider'
+  const isNgo = user.role === 'ngo' || user.role === 'volunteer'
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Top Navigation */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
+      {/* Top Header & Navigation Bar (Clean Light Mode) */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          {/* Logo & Platform Name */}
           <div className="flex items-center space-x-3">
-            <span className="text-2xl font-black bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              AnnaPurti
+            <span className="text-2xl font-black tracking-tight text-slate-900">
+              Anna<span className="text-emerald-600">Purti</span>
             </span>
-            <span className="text-xs uppercase font-semibold tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded">
-              FoodRescue-AI MVP
+            <span
+              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md border ${
+                isAdmin
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              }`}
+            >
+              {isAdmin ? 'Admin Operations' : 'FoodRescue-AI'}
             </span>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-sm text-slate-600">
-              <span className="relative flex h-2.5 w-2.5">
-                <span
-                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    health?.status === 'ok' ? 'bg-emerald-400' : 'bg-amber-400'
-                  }`}
-                ></span>
-                <span
-                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                    health?.status === 'ok' ? 'bg-emerald-500' : 'bg-amber-500'
-                  }`}
-                ></span>
-              </span>
-              <span>
-                {loading ? 'Connecting...' : health ? 'API Online' : 'Offline'}
-              </span>
+          {/* Navigation Tabs — STRICT ROLE ISOLATION:
+              Users can NEVER see the Admin Explain View tab! */}
+          <nav className="hidden md:flex items-center space-x-1 p-1 rounded-xl bg-slate-100">
+            {/* Donor Tab: ONLY visible if user is a Donor */}
+            {isDonor && (
+              <button
+                onClick={() => setActiveTab('donor')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'donor'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Utensils className="w-3.5 h-3.5" />
+                <span>Donor Intake & Listings</span>
+              </button>
+            )}
+
+            {/* NGO Tab: ONLY visible if user is an NGO */}
+            {isNgo && (
+              <button
+                onClick={() => setActiveTab('ngo')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'ngo'
+                    ? 'bg-white text-purple-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <HeartHandshake className="w-3.5 h-3.5" />
+                <span>NGO Food Discovery & Claims</span>
+              </button>
+            )}
+
+            {/* Admin Tab: ONLY visible if user is an Admin.
+                Normal users CANNOT see or access this tab. */}
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'admin'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Admin Operations & Explain View</span>
+              </button>
+            )}
+
+            {/* Impact Tab: Visible to everyone */}
+            <button
+              onClick={() => setActiveTab('impact')}
+              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'impact'
+                  ? 'bg-white text-teal-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Public Impact</span>
+            </button>
+          </nav>
+
+          {/* User Profile Badge & Logout Control */}
+          <div className="flex items-center space-x-3">
+            {/* Authenticated User Info */}
+            <div className="flex items-center space-x-2 px-3 py-1 rounded-xl text-xs bg-slate-50 border border-slate-200 text-slate-700">
+              <div
+                className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white ${
+                  isAdmin
+                    ? 'bg-blue-600'
+                    : isDonor
+                    ? 'bg-emerald-600'
+                    : 'bg-purple-600'
+                }`}
+              >
+                {isAdmin ? <ShieldAlert className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
+              </div>
+              <div className="text-left hidden sm:block">
+                <span className="block font-bold leading-tight truncate max-w-[150px] text-slate-900">
+                  {user.name}
+                </span>
+                <span className="block text-[10px] text-slate-500 capitalize">
+                  {user.role === 'provider' ? 'Individual Donor' : user.role === 'ngo' ? 'NGO Receiver' : 'City Administrator'}
+                </span>
+              </div>
             </div>
+
+            {/* Health Pulse */}
+            <div
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border bg-slate-50 border-slate-200 text-slate-600"
+              title={apiOnline ? 'FastAPI Backend Connected' : 'Connecting to API'}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  apiOnline ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
+                }`}
+              />
+              <span className="hidden md:inline">{apiOnline ? 'API 8000' : 'Offline'}</span>
+            </div>
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 border border-slate-200 cursor-pointer"
+              title="Sign Out of Portal"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
+        </div>
+
+        {/* Mobile Navigation Bar */}
+        <div className="md:hidden flex border-t border-slate-200 bg-slate-50 px-2 py-1 overflow-x-auto justify-around text-xs">
+          {isDonor && (
+            <button
+              onClick={() => setActiveTab('donor')}
+              className={`px-3 py-1.5 rounded-lg font-bold ${
+                activeTab === 'donor' ? 'bg-emerald-600 text-white' : 'text-slate-600'
+              }`}
+            >
+              Donor
+            </button>
+          )}
+
+          {isNgo && (
+            <button
+              onClick={() => setActiveTab('ngo')}
+              className={`px-3 py-1.5 rounded-lg font-bold ${
+                activeTab === 'ngo' ? 'bg-purple-600 text-white' : 'text-slate-600'
+              }`}
+            >
+              NGO
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`px-3 py-1.5 rounded-lg font-bold ${
+                activeTab === 'admin' ? 'bg-blue-600 text-white' : 'text-slate-600'
+              }`}
+            >
+              Admin Explain
+            </button>
+          )}
+
+          <button
+            onClick={() => setActiveTab('impact')}
+            className={`px-3 py-1.5 rounded-lg font-bold ${
+              activeTab === 'impact' ? 'bg-teal-600 text-white' : 'text-slate-600'
+            }`}
+          >
+            Impact
+          </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-br from-emerald-700 via-teal-800 to-slate-900 rounded-2xl text-white p-8 sm:p-10 shadow-lg mb-8">
-          <div className="max-w-3xl">
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">
-              Intelligent Surplus Food Redistribution
-            </h1>
-            <p className="text-emerald-100 text-base sm:text-lg mb-6 leading-relaxed">
-              Constraint Satisfaction Problem (CSP) allocation solver & A* / heuristic routing engine with strict food safety guarantees for perishable urban food rescue.
-            </p>
-            <div className="flex flex-wrap gap-3 text-xs font-medium">
-              <span className="px-3 py-1.5 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
-                🚀 Hand-written CSP Solver
-              </span>
-              <span className="px-3 py-1.5 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
-                📍 Graph & Route-State A*
-              </span>
-              <span className="px-3 py-1.5 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
-                🛡️ Hard Safety Deadlines
-              </span>
-              <span className="px-3 py-1.5 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
-                🔒 PostgreSQL Row-Locking Concurrency
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* System Health Check Card */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Status Box */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h2 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-2">
-              Backend Health
-            </h2>
-            {loading && <p className="text-sm text-slate-500">Checking health...</p>}
-            {error && (
-              <div className="text-sm text-rose-600 bg-rose-50 p-3 rounded-lg border border-rose-200">
-                {error}
-              </div>
-            )}
-            {health && (
-              <div>
-                <div className="flex items-center space-x-2 mb-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                  <span className="font-semibold text-slate-800 capitalize">
-                    {health.status}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-500 space-y-1">
-                  <p>Service: {health.app} (v{health.version})</p>
-                  <p>Env: {health.environment}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Database Box */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h2 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-2">
-              Database Connection
-            </h2>
-            {loading && <p className="text-sm text-slate-500">Connecting to DB...</p>}
-            {health && (
-              <div>
-                <span
-                  className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-md ${
-                    health.database === 'connected'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}
-                >
-                  PostgreSQL 16: {health.database}
-                </span>
-                <p className="text-xs text-slate-500 mt-2">
-                  Session pool managed via SQLAlchemy 2.x & Alembic
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Current Phase */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h2 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-2">
-              Active Milestone
-            </h2>
-            <div className="flex items-center space-x-2">
-              <span className="text-emerald-600 font-bold text-lg">Phase 0</span>
-              <span className="text-xs font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
-                Scaffolding & Setup
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">
-              Branch: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">phase-0</code>
-            </p>
-          </div>
-        </div>
-
-        {/* Phase Plan Overview */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">
-            Implementation Roadmap
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { num: 'Phase 0', title: 'Project Setup & Scaffolding', status: 'In Progress' },
-              { num: 'Phase 1', title: 'Data Model & Row-Locked Inventory', status: 'Pending' },
-              { num: 'Phase 2', title: 'Food Safety Rules & Travel Matrix', status: 'Pending' },
-              { num: 'Phase 3', title: 'CSP Allocation Engine (MRV+AC3)', status: 'Pending' },
-              { num: 'Phase 4', title: 'Routing Engine (A* + Heuristics)', status: 'Pending' },
-              { num: 'Phase 5', title: 'Feedback Loop & Failure Ladder', status: 'Pending' },
-              { num: 'Phase 6', title: 'Simulation & Evaluation Baselines', status: 'Pending' },
-              { num: 'Phase 7', title: 'REST API Layer & Badges', status: 'Pending' },
-              { num: 'Phase 8', title: 'Frontend Dashboards & Explain View', status: 'Pending' },
-              { num: 'Phase 9', title: 'Agreed Extras (QR, Intake, What-If)', status: 'Pending' },
-              { num: 'Phase 10', title: 'Docker, Benchmark Report & Demo', status: 'Pending' },
-            ].map((phase, idx) => (
-              <div
-                key={idx}
-                className={`p-4 rounded-lg border text-sm ${
-                  phase.status === 'In Progress'
-                    ? 'border-emerald-500 bg-emerald-50/50'
-                    : 'border-slate-200 bg-slate-50/50'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-slate-800">{phase.num}</span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded font-medium ${
-                      phase.status === 'In Progress'
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {phase.status}
-                  </span>
-                </div>
-                <p className="text-slate-600 text-xs">{phase.title}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        {/* Render Only Allowed Views */}
+        {activeTab === 'donor' && isDonor && <DonorDashboard />}
+        {activeTab === 'ngo' && isNgo && <NgoDashboard />}
+        {activeTab === 'admin' && isAdmin && <AdminExplainView />}
+        {activeTab === 'impact' && <ImpactDashboard />}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-500">
-          FoodRescue-AI (AnnaPurti) • Perishable Urban Food Rescue MVP
+      {/* Clean Light Footer */}
+      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-slate-700">FoodRescue-AI (AnnaPurti)</span>
+            <span>•</span>
+            <span>Constraint Satisfaction Allocation & A* Vehicle Routing Engine</span>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <span className="text-[11px] text-slate-400">
+              Ahmedabad Pilot • Strict Food Safety Constraints
+            </span>
+          </div>
         </div>
       </footer>
     </div>
@@ -209,4 +277,3 @@ function App() {
 }
 
 export default App
-
