@@ -68,3 +68,4 @@ def login(request: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 def get_me(current_user: User = Depends(get_current_user)) -> UserResponse:
     """Returns the authenticated user profile."""
     return UserResponse.model_validate(current_user)
+

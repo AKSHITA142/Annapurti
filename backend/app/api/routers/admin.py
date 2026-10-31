@@ -148,3 +148,4 @@ def verify_user(
     user.verified = verified
     db.commit()
     return {"user_id": user.id, "email": user.email, "verified": user.verified}
+

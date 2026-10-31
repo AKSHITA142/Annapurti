@@ -60,3 +60,4 @@ def get_impact_summary(db: Session = Depends(get_db)) -> ImpactSummaryResponse:
         co2_saved_kg=co2_saved_kg,
         co2_assumption="Based on UNEP/FAO benchmarks: 1 meal rescued avoids approx 1.0 kg of CO2e emissions (2.5 kg CO2e per kg of food).",
     )
+

@@ -13,3 +13,4 @@ class ImpactSummaryResponse(BaseModel):
     estimated_people_served: int
     co2_saved_kg: float
     co2_assumption: str
+
