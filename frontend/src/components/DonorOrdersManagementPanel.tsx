@@ -8,6 +8,7 @@ import {
   XCircle,
   MapPin,
   Send,
+  MessageSquare,
 } from 'lucide-react'
 import {
   DonationRequest,
@@ -16,6 +17,7 @@ import {
   dispatchOrder,
   completeDelivery,
 } from '../api/client'
+import { DonorNgoChatModal } from './DonorNgoChatModal'
 
 interface DonorOrdersManagementPanelProps {
   requests: DonationRequest[]
@@ -30,6 +32,8 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
   const [countdown, setCountdown] = useState<number>(58)
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [activeChatRequest, setActiveChatRequest] = useState<DonationRequest | null>(null)
 
   // Countdown timer for pending decision window
   useEffect(() => {
@@ -443,10 +447,47 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
                   <span className="text-[11px] text-emerald-700 font-bold">Completed</span>
                 </div>
               )}
+
+              {/* Direct NGO Communication & Photo Proof Trigger */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveChatRequest(req)
+                  setChatOpen(true)
+                }}
+                className="w-full mt-2 py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-700 hover:text-emerald-800 text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-2xs"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                <span>💬 Chat with NGO &amp; View Meal Distribution Proof</span>
+              </button>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Floating Chat Trigger for Quick Coordination */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          onClick={() => {
+            setActiveChatRequest(requests[0] || null)
+            setChatOpen(true)
+          }}
+          className="flex items-center space-x-2 px-4 py-3 rounded-full bg-gradient-to-r from-emerald-700 to-[#0F382A] text-white font-extrabold text-xs shadow-xl hover:scale-105 transition-all cursor-pointer border border-emerald-500/40"
+        >
+          <MessageSquare className="w-4 h-4 text-emerald-300 animate-pulse" />
+          <span>Live Chat &amp; Beneficiary Proofs</span>
+        </button>
+      </div>
+
+      {/* Donor-NGO Chat & Photo Proof Modal */}
+      <DonorNgoChatModal
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        requestId={activeChatRequest?.id}
+        orderTitle={activeChatRequest?.listing_name}
+        partnerName={activeChatRequest?.receiver_name || 'Apang Manav Mandal Shelter'}
+        currentUserRole="provider"
+      />
     </div>
   )
 }

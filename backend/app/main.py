@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api.routers import admin, allocations, auth, delivery, impact, listings, requests
+from app.api.routers import admin, allocations, auth, chat, delivery, impact, listings, requests
 from app.config import settings
 from app.db import Base, SessionLocal, engine
 from app.schemas.admin import SimEventRequest, SimScenarioRequest
@@ -38,6 +38,7 @@ app.include_router(allocations.router)
 app.include_router(delivery.router)
 app.include_router(admin.router)
 app.include_router(impact.router)
+app.include_router(chat.router)
 
 
 # Top-level aliases for simulation convenience

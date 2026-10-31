@@ -419,3 +419,40 @@ export async function triggerSimEvent(eventType: string, payload: Record<string,
 export async function getImpactSummary() {
   return request<ImpactSummary>('/impact/summary')
 }
+
+export interface ChatMessage {
+  id: number
+  request_id?: number
+  sender_id: number
+  sender_name: string
+  sender_role: 'provider' | 'ngo' | 'volunteer' | 'admin'
+  recipient_id?: number
+  message: string
+  photo_url?: string
+  people_served?: number
+  message_type: 'text' | 'feedback_photo' | 'thank_you' | string
+  created_at: string
+}
+
+export async function sendChatMessage(payload: {
+  request_id?: number
+  recipient_id?: number
+  message: string
+  photo_url?: string
+  people_served?: number
+  message_type?: string
+}) {
+  return request<ChatMessage>('/chat/messages', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getChatMessages(requestId?: number) {
+  const qs = requestId ? `?request_id=${requestId}` : ''
+  return request<ChatMessage[]>(`/chat/messages${qs}`)
+}
+
+export async function getDonorFeedback() {
+  return request<ChatMessage[]>('/chat/feedback/donor')
+}

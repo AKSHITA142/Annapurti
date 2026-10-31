@@ -4,6 +4,7 @@ from app.models.request import DonationRequest
 from app.models.vehicle import Vehicle
 from app.models.delivery import DeliveryJob, DeliveryConfirmation, UtilizationReport
 from app.models.log import DecisionLog
+from app.models.chat import ChatMessage
 
 __all__ = [
     "User",
@@ -15,5 +16,6 @@ __all__ = [
     "DeliveryConfirmation",
     "UtilizationReport",
     "DecisionLog",
+    "ChatMessage",
 ]
 

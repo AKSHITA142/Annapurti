@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   Truck,
   X,
+  MessageSquare,
+  Camera,
 } from 'lucide-react'
 import {
   DonationRequest,
@@ -33,6 +35,7 @@ import {
 import { FeasibilityBadge } from '../components/FeasibilityBadge'
 import { SpoilageCountdown } from '../components/SpoilageCountdown'
 import { QRCodeModal } from '../components/QRCodeModal'
+import { DonorNgoChatModal } from '../components/DonorNgoChatModal'
 
 export function NgoDashboard() {
   const [listings, setListings] = useState<FoodListing[]>([])
@@ -76,6 +79,9 @@ export function NgoDashboard() {
     notes: '',
   })
   const [submittingReport, setSubmittingReport] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [activeChatRequest, setActiveChatRequest] = useState<DonationRequest | null>(null)
+  const [chatFeedbackMode, setChatFeedbackMode] = useState(false)
 
   // Countdown timer for 60-second offer window
   useEffect(() => {
@@ -998,19 +1004,44 @@ export function NgoDashboard() {
                         )}
 
                         {r.status === 'completed' && (
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => {
+                                setActiveChatRequest(r)
+                                setChatFeedbackMode(true)
+                                setChatOpen(true)
+                              }}
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                            >
+                              <Camera className="w-3.5 h-3.5" />
+                              <span>Share Distribution Photos &amp; Proof</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setActiveChatRequest(r)
+                                setChatFeedbackMode(false)
+                                setChatOpen(true)
+                              }}
+                              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>Chat</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {['offered', 'allocated', 'dispatched'].includes(r.status) && (
                           <button
                             onClick={() => {
-                              setReportingReq(r)
-                              setReportData({
-                                reported_distributed_lots: r.allocated_lots || 4,
-                                people_served: (r.allocated_lots || 4) * 10,
-                                photo_url: '',
-                                notes: '',
-                              })
+                              setActiveChatRequest(r)
+                              setChatFeedbackMode(false)
+                              setChatOpen(true)
                             }}
-                            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-purple-600 text-white hover:bg-purple-700 cursor-pointer"
+                            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
+                            title="Chat with restaurant"
                           >
-                            Submit Utilization Report
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Chat</span>
                           </button>
                         )}
 
@@ -1272,6 +1303,32 @@ export function NgoDashboard() {
           </div>
         </div>
       )}
+
+      {/* Floating Chat Trigger for NGO */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          onClick={() => {
+            setActiveChatRequest(myRequests[0] || null)
+            setChatFeedbackMode(false)
+            setChatOpen(true)
+          }}
+          className="flex items-center space-x-2 px-4 py-3 rounded-full bg-gradient-to-r from-purple-700 to-indigo-800 text-white font-extrabold text-xs shadow-xl hover:scale-105 transition-all cursor-pointer border border-purple-400/40"
+        >
+          <MessageSquare className="w-4 h-4 text-purple-200 animate-pulse" />
+          <span>Chat with Restaurant</span>
+        </button>
+      </div>
+
+      {/* NGO-Donor Chat & Photo Proof Modal */}
+      <DonorNgoChatModal
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        requestId={activeChatRequest?.id}
+        orderTitle={activeChatRequest?.listing_name}
+        partnerName={activeChatRequest?.provider_name || 'Taj Skyline Hotel'}
+        currentUserRole="ngo"
+        defaultFeedbackMode={chatFeedbackMode}
+      />
     </div>
   )
 }
