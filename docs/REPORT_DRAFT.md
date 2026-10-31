@@ -226,3 +226,4 @@ graph TD
 1. **Food Donor Protection (Good Samaritan Act):** Under Section 88 of the Food Safety and Standards Act of India, bona fide donors are protected from liability when donating wholesome food in good faith.
 2. **Receiver Dignity & Privacy:** Post-delivery photo documentation is completely optional and non-intrusive.
 3. **Algorithmic Fairness:** Priority class weights ensure orphanages and vulnerable shelters receive equitable allocation regardless of geographical distance from affluent banquet clusters.
+

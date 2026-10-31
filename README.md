@@ -231,3 +231,4 @@ FoodRescue-AI includes a comprehensive, multi-role interface with a real-time Pe
 - **Software License:** MIT License.
 - **Simulation Disclaimer:** All donor, vehicle, and NGO coordinates represent a simulated logistics testbed based on Ahmedabad, Gujarat.
 - **Liability Notice:** Good Samaritan food donation liability frameworks and beneficiary facial privacy remain out of computational scope.
+

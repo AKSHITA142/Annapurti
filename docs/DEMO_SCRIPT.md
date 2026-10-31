@@ -118,3 +118,4 @@
    - Point out the scientific assumption text:
      > *"Based on UNEP/FAO benchmarks: 1 meal rescued avoids approx 1.0 kg of $\text{CO}_2\text{e}$ emissions."*
 4. **Conclusion:** *"In 7 minutes, we demonstrated an end-to-end redistribution workflow with provable safety guarantees, atomic concurrency, and algorithmic transparency."*
+

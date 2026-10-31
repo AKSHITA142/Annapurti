@@ -182,3 +182,4 @@ This document provides concise, high-depth technical answers and architectural d
      - Triggers an **Urgent Dispatch Event**: the nearest active vehicle with compatible storage and sufficient remaining capacity is dynamically reassigned to rendezvous with the stranded vehicle and complete delivery before FSSAI expiry.
   4. **Cryptographic OTP Handover Verification:**
      - Delivery is only recorded as complete when the recipient provides a 6-digit one-time password (generated upon reservation), preventing spoofed or erroneous drop-offs.
+
