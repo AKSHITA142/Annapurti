@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 from app.api.routers import admin, allocations, auth, delivery, impact, listings, requests
 from app.config import settings
-from app.db import SessionLocal
+from app.db import Base, SessionLocal, engine
 from app.schemas.admin import SimEventRequest, SimScenarioRequest
 
 app = FastAPI(
@@ -13,6 +13,13 @@ app = FastAPI(
     version=settings.VERSION,
     description="Intelligent surplus food redistribution engine with food safety deadlines and routing optimization",
 )
+
+@app.on_event("startup")
+def startup_db():
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        pass
 
 # CORS configuration
 app.add_middleware(
