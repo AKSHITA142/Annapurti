@@ -467,3 +467,4 @@ def seed_database(force: bool = False):
 if __name__ == "__main__":
     force_seed = "--force" in sys.argv
     seed_database(force=force_seed)
+
