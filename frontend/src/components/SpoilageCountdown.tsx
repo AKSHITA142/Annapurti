@@ -84,3 +84,4 @@ export function SpoilageCountdown({ safeDeadline, compact = false }: SpoilageCou
     </span>
   )
 }
+

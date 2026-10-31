@@ -8,3 +8,4 @@ export function SimulatedBadge({ className = '' }: { className?: string }) {
     </span>
   )
 }
+
