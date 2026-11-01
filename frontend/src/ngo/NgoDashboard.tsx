@@ -17,6 +17,9 @@ import {
   MessageSquare,
   Camera,
   MapPin,
+  ChevronLeft,
+  ChevronRight,
+  Info,
 } from 'lucide-react'
 import {
   DonationRequest,
@@ -83,6 +86,12 @@ export function NgoDashboard() {
   const [chatOpen, setChatOpen] = useState(false)
   const [activeChatRequest, setActiveChatRequest] = useState<DonationRequest | null>(null)
   const [chatFeedbackMode, setChatFeedbackMode] = useState(false)
+
+  // Order history filter, pagination, and audit modal states
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'in_progress' | 'completed'>('all')
+  const [historyPage, setHistoryPage] = useState<number>(1)
+  const [viewHistoryDetailsReq, setViewHistoryDetailsReq] = useState<DonationRequest | null>(null)
+  const HISTORY_PER_PAGE = 3
 
   // Countdown timer for 60-second offer window
   useEffect(() => {
@@ -562,167 +571,119 @@ export function NgoDashboard() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {safeAvailableListings.map((l) => {
-              const prepTime = l.prepared_at
-                ? new Date(parseIsoDate(l.prepared_at)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : 'Recent'
-              const deadlineClock = l.safe_deadline
-                ? new Date(parseIsoDate(l.safe_deadline)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : ''
-              const pctRemaining = Math.max(0, Math.min(100, (l.available_lots / (l.total_lots || 1)) * 100))
+              const totalMeals = l.available_lots * l.lot_size
 
               return (
                 <div
                   key={l.id}
-                  className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                  onClick={() => {
+                    setSelectedListing(l)
+                    setRequestedLots(Math.min(2, l.available_lots))
+                    setRequestError(null)
+                    setRequestSuccess(null)
+                  }}
+                  className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 hover:border-purple-300 cursor-pointer group overflow-hidden"
                 >
-                  <div>
-                    {/* Restaurant & Feasibility Header with Quick Donor Switcher */}
-                    <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                  <div className="space-y-3">
+                    {/* Header: Provider & Compact Feasibility Badge */}
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                        <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold shrink-0">
                           <Building2 className="w-4 h-4" />
                         </div>
-                        <div>
-                          <span className="font-extrabold text-xs text-slate-900 block leading-tight">
+                        <div className="min-w-0">
+                          <span className="font-extrabold text-xs text-slate-900 block truncate leading-tight">
                             {l.provider_name || 'Taj Skyline Hotel'}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono block">
+                          <span className="text-[10px] text-slate-400 font-mono block truncate">
                             {l.provider_email || 'taj.skyline@ahmedabad.com'}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            window.dispatchEvent(
-                              new CustomEvent('foodrescue:switch_persona', {
-                                detail: {
-                                  email: l.provider_email || 'taj.skyline@ahmedabad.com',
-                                  role: 'provider',
-                                  targetTab: 'donor',
-                                },
-                              })
-                            )
-                          }}
-                          className="px-2 py-0.8 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center gap-1 cursor-pointer"
-                          title="Switch to this donor's account to fulfill and dispatch this listing"
-                        >
-                          <RefreshCw className="w-2.5 h-2.5 text-emerald-600" />
-                          <span>Switch to Donor</span>
-                        </button>
+                      <div className="shrink-0">
                         <FeasibilityBadge
                           badge={l.feasibility_badge}
                           slackMinutes={l.journey_slack_minutes}
+                          showSlack={false}
                         />
                       </div>
                     </div>
 
-                    {/* Food Name & Veg/Non-Veg & Category Badges */}
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-black text-slate-900 text-base leading-snug">{l.name}</h3>
-                      {l.veg ? (
-                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          Pure Veg
-                        </span>
-                      ) : (
-                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
-                          Non-Veg
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
-                      <span className="capitalize font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                        {l.category.replace('_', ' ')}
-                      </span>
-                      <span>•</span>
-                      <span>{l.lot_size} meals/lot</span>
-                    </div>
-
-                    {/* Spoilage Countdown & Deadline Details */}
-                    <div className="my-3.5 p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                      <div className="text-[11px] text-slate-500 flex items-center justify-between">
-                        <span className="font-semibold">Safe Handling Window</span>
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      </div>
-                      <SpoilageCountdown safeDeadline={l.safe_deadline} />
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
-                        <span>Prepared: <strong className="text-slate-700">{prepTime}</strong></span>
-                        <span>Deadline: <strong className="text-rose-700">{deadlineClock}</strong></span>
-                      </div>
-                    </div>
-
-                    {/* Quantity Tracking & Logistics Parameters */}
-                    <div className="bg-purple-50/50 p-3.5 rounded-2xl border border-purple-100 text-xs space-y-2.5">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-slate-600 font-medium">Available Quantity:</span>
-                          <span className="font-extrabold text-purple-900">
-                            {l.available_lots} of {l.total_lots} lots ({l.available_lots * l.lot_size} meals)
+                    {/* Food Name & Badges */}
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-black text-slate-900 text-base leading-snug group-hover:text-purple-700 transition-colors">
+                          {l.name}
+                        </h3>
+                        {l.veg ? (
+                          <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Pure Veg
                           </span>
-                        </div>
-                        {/* Mini Availability Bar */}
-                        <div className="w-full h-2 bg-slate-200/70 rounded-full overflow-hidden">
-                          <div
-                            style={{ width: `${pctRemaining}%` }}
-                            className={`h-full transition-all duration-300 ${
-                              pctRemaining > 40 ? 'bg-purple-600' : pctRemaining > 15 ? 'bg-amber-500' : 'bg-rose-500'
-                            }`}
-                          />
-                        </div>
+                        ) : (
+                          <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
+                            Non-Veg
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-purple-100">
-                        <div className="flex items-center space-x-1 text-slate-600">
-                          <MapPin className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                          <span className="font-medium">Pickup Node:</span>
-                        </div>
-                        <span className="font-semibold text-slate-800">
-                          {l.pickup_lat?.toFixed(3)}, {l.pickup_lng?.toFixed(3)}
+                      <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
+                        <span className="capitalize font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                          {l.category.replace('_', ' ')}
+                        </span>
+                        <span>•</span>
+                        <span className="font-medium">{l.lot_size} meals/lot</span>
+                      </div>
+                    </div>
+
+                    {/* Clean Minimalist Summary Cards */}
+                    <div className="space-y-2 pt-1">
+                      {/* Available Quantity */}
+                      <div className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-purple-50/60 border border-purple-100/70">
+                        <span className="text-slate-600 font-medium">Available Quantity:</span>
+                        <span className="font-extrabold text-purple-900">
+                          {totalMeals} meals ({l.available_lots} of {l.total_lots} lots)
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-600">Delivery Mode:</span>
-                        <span className="font-semibold text-slate-800 capitalize">
-                          {l.delivery_mode_offered?.replace('_', ' ') || 'Sender Vehicle'}
+                      {/* Safe Handling Countdown */}
+                      <div className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-slate-600 font-medium flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          Safe Handling:
                         </span>
-                      </div>
-
-                      <div className="flex justify-between items-center text-[11px]">
-                        <span className="text-slate-600">Helping Contribution:</span>
-                        <span className="font-bold text-emerald-700">
-                          {l.contribution_amount ? `~₹${l.contribution_amount} token fee` : '~₹50 token fee'}
-                        </span>
+                        <SpoilageCountdown safeDeadline={l.safe_deadline} />
                       </div>
                     </div>
                   </div>
 
-                  {/* Big Request Button */}
-                  <button
-                    disabled={l.available_lots <= 0 || l.feasibility_badge === 'infeasible'}
-                    onClick={() => {
-                      setSelectedListing(l)
-                      setRequestedLots(Math.min(2, l.available_lots))
-                      setRequestError(null)
-                      setRequestSuccess(null)
-                    }}
-                    className={`w-full py-3 px-4 rounded-2xl text-xs font-extrabold flex items-center justify-center space-x-2 transition-all shadow-xs ${
-                      l.available_lots > 0 && l.feasibility_badge !== 'infeasible'
-                        ? 'bg-purple-600 text-white hover:bg-purple-700 cursor-pointer'
-                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>
-                      {l.available_lots <= 0
-                        ? 'Exhausted (0 Lots Remaining)'
-                        : l.feasibility_badge === 'infeasible'
-                        ? 'Infeasible (Safety Deadline Miss)'
-                        : `Request Food from ${l.provider_name ? l.provider_name.split(' ')[0] : 'Restaurant'}`}
-                    </span>
-                  </button>
+                  {/* Clean Action Button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={l.available_lots <= 0 || l.feasibility_badge === 'infeasible'}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedListing(l)
+                        setRequestedLots(Math.min(2, l.available_lots))
+                        setRequestError(null)
+                        setRequestSuccess(null)
+                      }}
+                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center space-x-1.5 transition-all shadow-xs ${
+                        l.available_lots > 0 && l.feasibility_badge !== 'infeasible'
+                          ? 'bg-purple-600 text-white hover:bg-purple-700 cursor-pointer'
+                          : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      }`}
+                    >
+                      <span>
+                        {l.available_lots <= 0
+                          ? 'Exhausted (0 Lots)'
+                          : l.feasibility_badge === 'infeasible'
+                          ? 'Infeasible Route'
+                          : 'View Details & Claim'}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               )
             })}
@@ -931,269 +892,466 @@ export function NgoDashboard() {
           )}
 
           {/* C. LIST OF ALL ORDERS & 5-STAGE PIPELINE TRACKER */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs space-y-5">
-            <div>
-              <h3 className="text-lg font-black text-slate-800 flex items-center space-x-2">
-                <Clock className="w-5 h-5 text-purple-600" />
-                <span>All Orders &amp; Delivery History ({myRequests.length})</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Complete audit trail of requests, safety calculation offers, vehicle transit, and verified handovers.
-              </p>
-            </div>
+          {(() => {
+            const inProgressRequests = myRequests.filter((r) =>
+              ['pending', 'offered', 'allocated', 'dispatched'].includes(r.status)
+            )
+            const completedHistoryRequests = myRequests.filter((r) => r.status === 'completed')
 
-            {myRequests.length === 0 ? (
-              <p className="text-sm text-slate-400 py-8 text-center">
-                You haven't requested any food yet. Switch to "Browse Restaurant Food" to claim available batches!
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {myRequests.map((r) => (
-                  <div
-                    key={r.id}
-                    className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-3.5 hover:border-slate-300 transition-all"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h4 className="font-bold text-base text-slate-900">
-                            {r.listing_name || `Listing #${r.listing_id}`}
-                          </h4>
-                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold">
-                            #{r.id}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
-                          <span>
-                            Restaurant: <strong className="text-slate-800">{r.provider_name || 'Taj Skyline Hotel'}</strong>
-                          </span>
-                          <span>•</span>
-                          <span>
-                            Quantity:{' '}
-                            <strong className="text-slate-800">
-                              {r.allocated_lots || r.requested_lots} lots (
-                              {(r.allocated_lots || r.requested_lots) * 10} meals)
-                            </strong>
-                          </span>
-                          <span>•</span>
-                          <span>
-                            Helping Fee: <strong className="text-emerald-700">₹{r.nominal_price || 50}</strong>
-                          </span>
-                        </div>
-                      </div>
+            const activeHistoryList =
+              historyFilter === 'in_progress'
+                ? inProgressRequests
+                : historyFilter === 'completed'
+                ? completedHistoryRequests
+                : myRequests
 
-                      {/* Stage Pill */}
-                      <div>
-                        {r.status === 'pending' && (
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 flex items-center space-x-1">
-                            <Clock className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Stage 1: Awaiting Restaurant Calculation</span>
-                          </span>
-                        )}
-                        {r.status === 'offered' && (
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-200 text-amber-900 border border-amber-300 flex items-center space-x-1 animate-pulse">
-                            <Clock className="w-3.5 h-3.5 text-amber-700" />
-                            <span>Stage 2: Offer Sent (60s Timer)</span>
-                          </span>
-                        )}
-                        {r.status === 'allocated' && (
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center space-x-1">
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Stage 3: Confirmed &amp; Scheduled</span>
-                          </span>
-                        )}
-                        {r.status === 'dispatched' && (
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200 flex items-center space-x-1">
-                            <Truck className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Stage 4: Out for Delivery</span>
-                          </span>
-                        )}
-                        {r.status === 'completed' && (
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center space-x-1">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Stage 5: Delivered &amp; Verified</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
+            const totalHistoryPages = Math.max(1, Math.ceil(activeHistoryList.length / HISTORY_PER_PAGE))
+            const safeHistoryPage = Math.min(historyPage, totalHistoryPages)
+            const paginatedHistory = activeHistoryList.slice(
+              (safeHistoryPage - 1) * HISTORY_PER_PAGE,
+              safeHistoryPage * HISTORY_PER_PAGE
+            )
 
-                    {/* 5-Stage Live Pipeline Progress Bar */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-center text-[10px] font-bold">
-                      <div className="p-2 rounded-xl bg-emerald-100 text-emerald-900">
-                        1. Request Sent
-                      </div>
+            return (
+              <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800 flex items-center space-x-2">
+                      <Clock className="w-5 h-5 text-purple-600" />
+                      <span>All Orders &amp; Delivery History ({myRequests.length})</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Audit trail of food requests, safety calculations, vehicle transit, and verified handovers.
+                    </p>
+                  </div>
+
+                  {/* History Filter Tabs */}
+                  <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl self-start sm:self-auto text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHistoryFilter('all')
+                        setHistoryPage(1)
+                      }}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                        historyFilter === 'all'
+                          ? 'bg-white text-purple-700 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All ({myRequests.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHistoryFilter('in_progress')
+                        setHistoryPage(1)
+                      }}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                        historyFilter === 'in_progress'
+                          ? 'bg-white text-blue-700 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      In Progress ({inProgressRequests.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHistoryFilter('completed')
+                        setHistoryPage(1)
+                      }}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                        historyFilter === 'completed'
+                          ? 'bg-white text-emerald-700 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Delivered ({completedHistoryRequests.length})
+                    </button>
+                  </div>
+                </div>
+
+                {activeHistoryList.length === 0 ? (
+                  <div className="py-10 text-center space-y-2">
+                    <Package className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm font-semibold text-slate-600">
+                      {historyFilter === 'in_progress'
+                        ? 'No active orders in progress'
+                        : historyFilter === 'completed'
+                        ? 'No delivered orders in history yet'
+                        : "You haven't requested any food yet"}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Switch to "Browse Restaurant Food" to claim available batches!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5">
+                    {paginatedHistory.map((r) => (
                       <div
-                        className={`p-2 rounded-xl ${
-                          ['offered', 'allocated', 'dispatched', 'completed'].includes(r.status)
-                            ? 'bg-emerald-100 text-emerald-900'
-                            : 'bg-slate-200 text-slate-500'
-                        }`}
+                        key={r.id}
+                        className="p-4 sm:p-5 rounded-2xl border border-slate-200/90 bg-slate-50/60 hover:bg-white hover:border-purple-200 hover:shadow-xs transition-all space-y-3"
                       >
-                        2. Calculated &amp; Offered
-                      </div>
-                      <div
-                        className={`p-2 rounded-xl ${
-                          ['allocated', 'dispatched', 'completed'].includes(r.status)
-                            ? 'bg-emerald-100 text-emerald-900'
-                            : 'bg-slate-200 text-slate-500'
-                        }`}
-                      >
-                        3. NGO Confirmed
-                      </div>
-                      <div
-                        className={`p-2 rounded-xl ${
-                          ['dispatched', 'completed'].includes(r.status)
-                            ? 'bg-blue-100 text-blue-900'
-                            : 'bg-slate-200 text-slate-500'
-                        }`}
-                      >
-                        4. Out for Delivery
-                      </div>
-                      <div
-                        className={`p-2 rounded-xl ${
-                          r.status === 'completed'
-                            ? 'bg-emerald-100 text-emerald-900'
-                            : 'bg-slate-200 text-slate-500'
-                        }`}
-                      >
-                        5. Handover Done
-                      </div>
-                    </div>
-
-                    {/* Card Actions */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2.5 border-t border-slate-200/80 text-xs">
-                      <div className="text-slate-600 flex items-center gap-1.5">
-                        <Truck className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{r.partner_details || 'Electric Cargo Van standby'}</span>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        {r.status === 'offered' && (
-                          <button
-                            onClick={() => handleAcceptOffer(r.id)}
-                            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs cursor-pointer"
-                          >
-                            Accept 60s Offer (₹50)
-                          </button>
-                        )}
-
-                        {r.status === 'allocated' && (
-                          <div className="flex items-center space-x-2">
-                            <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                              Awaiting Restaurant Dispatch
-                            </span>
-                            <button
-                              onClick={() => openQrForRequest(r)}
-                              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
-                            >
-                              <QrCode className="w-3.5 h-3.5" />
-                              <span>QR Pass</span>
-                            </button>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <h4 className="font-extrabold text-base text-slate-900 truncate">
+                                {r.listing_name || `Listing #${r.listing_id}`}
+                              </h4>
+                              <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold shrink-0">
+                                #{r.id}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-2">
+                              <span>
+                                Restaurant: <strong className="text-slate-800">{r.provider_name || 'Taj Skyline Hotel'}</strong>
+                              </span>
+                              <span>•</span>
+                              <span>
+                                Quantity:{' '}
+                                <strong className="text-slate-800">
+                                  {r.allocated_lots || r.requested_lots} lots (
+                                  {(r.allocated_lots || r.requested_lots) * 10} meals)
+                                </strong>
+                              </span>
+                              <span>•</span>
+                              <span>
+                                Helping Fee: <strong className="text-emerald-700">₹{r.nominal_price || 50}</strong>
+                              </span>
+                            </div>
                           </div>
-                        )}
 
-                        {r.status === 'dispatched' && (
-                          <div className="flex items-center space-x-2">
-                            <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center space-x-1">
-                              <Truck className="w-3 h-3 text-blue-600 animate-bounce" />
-                              <span>En Route (ETA ~1 min)</span>
-                            </span>
-                            <button
-                              onClick={() => openQrForRequest(r)}
-                              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
-                            >
-                              <QrCode className="w-3.5 h-3.5" />
-                              <span>QR Pass</span>
-                            </button>
+                          {/* Stage Pill */}
+                          <div className="shrink-0">
+                            {r.status === 'pending' && (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 flex items-center space-x-1">
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Stage 1: Awaiting Calculation</span>
+                              </span>
+                            )}
+                            {r.status === 'offered' && (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-200 text-amber-900 border border-amber-300 flex items-center space-x-1 animate-pulse">
+                                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                <span>Stage 2: Offer Sent (60s)</span>
+                              </span>
+                            )}
+                            {r.status === 'allocated' && (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center space-x-1">
+                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Stage 3: Confirmed &amp; Scheduled</span>
+                              </span>
+                            )}
+                            {r.status === 'dispatched' && (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200 flex items-center space-x-1">
+                                <Truck className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Stage 4: Out for Delivery</span>
+                              </span>
+                            )}
+                            {r.status === 'completed' && (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center space-x-1">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Stage 5: Delivered &amp; Verified</span>
+                              </span>
+                            )}
                           </div>
-                        )}
+                        </div>
 
-                        {r.status === 'completed' && (
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => {
-                                setActiveChatRequest(r)
-                                setChatFeedbackMode(true)
-                                setChatOpen(true)
-                              }}
-                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center space-x-1.5 shadow-xs cursor-pointer"
-                            >
-                              <Camera className="w-3.5 h-3.5" />
-                              <span>Share Distribution Photos &amp; Proof</span>
-                            </button>
+                        {/* Card Actions & Fleet Details */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2.5 border-t border-slate-200/70 text-xs">
+                          <div className="text-slate-600 flex items-center gap-1.5 truncate">
+                            <Truck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{r.partner_details || 'Electric Cargo Van standby'}</span>
+                          </div>
+
+                          <div className="flex items-center flex-wrap gap-2">
+                            {r.status === 'offered' && (
+                              <button
+                                onClick={() => handleAcceptOffer(r.id)}
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs cursor-pointer"
+                              >
+                                Accept 60s Offer (₹50)
+                              </button>
+                            )}
+
+                            {r.status === 'allocated' && (
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                                  Awaiting Dispatch
+                                </span>
+                                <button
+                                  onClick={() => openQrForRequest(r)}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
+                                >
+                                  <QrCode className="w-3.5 h-3.5" />
+                                  <span>QR Pass</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {r.status === 'dispatched' && (
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 flex items-center space-x-1">
+                                  <Truck className="w-3 h-3 text-blue-600 animate-bounce" />
+                                  <span>En Route</span>
+                                </span>
+                                <button
+                                  onClick={() => openQrForRequest(r)}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
+                                >
+                                  <QrCode className="w-3.5 h-3.5" />
+                                  <span>QR Pass</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {r.status === 'completed' && (
+                              <button
+                                onClick={() => {
+                                  setActiveChatRequest(r)
+                                  setChatFeedbackMode(true)
+                                  setChatOpen(true)
+                                }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center space-x-1.5 shadow-2xs cursor-pointer"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                <span>Share Proof</span>
+                              </button>
+                            )}
+
                             <button
                               onClick={() => {
                                 setActiveChatRequest(r)
                                 setChatFeedbackMode(false)
                                 setChatOpen(true)
                               }}
-                              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
+                              title="Chat with restaurant"
                             >
-                              <MessageSquare className="w-3.5 h-3.5" />
+                              <MessageSquare className="w-3.5 h-3.5 text-purple-600" />
                               <span>Chat</span>
                             </button>
+
+                            <button
+                              onClick={() => setViewHistoryDetailsReq(r)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 flex items-center space-x-1 cursor-pointer"
+                              title="View full progress timeline & audit details"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                              <span>Audit Details</span>
+                            </button>
+
+                            {r.status === 'pending' && (
+                              <button
+                                onClick={() => handleCancelRequest(r.id)}
+                                className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            )}
                           </div>
-                        )}
-
-                        {['offered', 'allocated', 'dispatched'].includes(r.status) && (
-                          <button
-                            onClick={() => {
-                              setActiveChatRequest(r)
-                              setChatFeedbackMode(false)
-                              setChatOpen(true)
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 cursor-pointer"
-                            title="Chat with restaurant"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Chat</span>
-                          </button>
-                        )}
-
-                        {r.status === 'pending' && (
-                          <button
-                            onClick={() => handleCancelRequest(r.id)}
-                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        )}
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Pagination Controls */}
+                {activeHistoryList.length > 0 && totalHistoryPages > 1 && (
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-100">
+                    <span className="text-xs text-slate-500 font-medium">
+                      Showing{' '}
+                      <strong className="text-slate-800">
+                        {(safeHistoryPage - 1) * HISTORY_PER_PAGE + 1}-
+                        {Math.min(safeHistoryPage * HISTORY_PER_PAGE, activeHistoryList.length)}
+                      </strong>{' '}
+                      of <strong className="text-slate-800">{activeHistoryList.length}</strong> orders
+                    </span>
+
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        disabled={safeHistoryPage <= 1}
+                        onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1 cursor-pointer transition-colors"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <span>Prev</span>
+                      </button>
+
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: totalHistoryPages }, (_, idx) => idx + 1).map((pg) => (
+                          <button
+                            key={pg}
+                            type="button"
+                            onClick={() => setHistoryPage(pg)}
+                            className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              pg === safeHistoryPage
+                                ? 'bg-purple-600 text-white shadow-2xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {pg}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={safeHistoryPage >= totalHistoryPages}
+                        onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1 cursor-pointer transition-colors"
+                      >
+                        <span>Next</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
+            )
+          })()}
         </div>
       )}
 
-      {/* MODAL 1: REQUEST FOOD FROM RESTAURANT */}
+      {/* MODAL 1: DETAILED FOOD SPECIFICATION & CLAIM REQUEST */}
       {selectedListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 my-8">
+            {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <Building2 className="w-5 h-5 text-purple-600" />
-                <h3 className="text-lg font-black text-slate-900">
-                  Request from {selectedListing.provider_name || 'Restaurant'}
-                </h3>
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                  <Building2 className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                    {selectedListing.provider_name || 'Restaurant Donation'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    {selectedListing.provider_email || 'taj.skyline@ahmedabad.com'}
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => setSelectedListing(null)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent('foodrescue:switch_persona', {
+                        detail: {
+                          email: selectedListing.provider_email || 'taj.skyline@ahmedabad.com',
+                          role: 'provider',
+                          targetTab: 'donor',
+                        },
+                      })
+                    )
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Switch to this donor to manage and dispatch this listing"
+                >
+                  <RefreshCw className="w-3 h-3 text-emerald-600" />
+                  <span>Switch to Donor</span>
+                </button>
+                <button
+                  onClick={() => setSelectedListing(null)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="mb-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-1 text-xs">
-              <div className="font-bold text-slate-800 text-sm">{selectedListing.name}</div>
-              <div className="text-slate-500">
-                Available: {selectedListing.available_lots} lots ({selectedListing.available_lots * selectedListing.lot_size} meals)
+            {/* Food Title & Badges */}
+            <div className="mb-4 p-4 rounded-2xl bg-purple-50/40 border border-purple-100 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="font-black text-slate-900 text-lg leading-snug">
+                  {selectedListing.name}
+                </h4>
+                {selectedListing.veg ? (
+                  <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Pure Veg
+                  </span>
+                ) : (
+                  <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
+                    Non-Veg
+                  </span>
+                )}
               </div>
-              <div className="text-emerald-700 font-bold pt-1">
-                Nominal Helping Contribution: ~₹50 token fee
+              <div className="flex items-center space-x-2 text-xs text-slate-600">
+                <span className="capitalize font-semibold text-slate-800 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/70">
+                  {selectedListing.category.replace('_', ' ')}
+                </span>
+                <span>•</span>
+                <span className="font-bold text-purple-900">
+                  {selectedListing.available_lots} lots available ({selectedListing.available_lots * selectedListing.lot_size} total meals)
+                </span>
+              </div>
+            </div>
+
+            {/* Deep Safety, Feasibility & Route Buffer Breakdown */}
+            <div className="mb-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  Route Feasibility &amp; Spoilage
+                </span>
+                <FeasibilityBadge
+                  badge={selectedListing.feasibility_badge}
+                  slackMinutes={selectedListing.journey_slack_minutes}
+                  showSlack={true}
+                />
+              </div>
+
+              <div className="pt-1.5 border-t border-slate-200/70 flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Safe Handling Window:</span>
+                <SpoilageCountdown safeDeadline={selectedListing.safe_deadline} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/70 text-[11px]">
+                <div>
+                  <span className="text-slate-400 block">Prepared Time</span>
+                  <span className="font-semibold text-slate-700">
+                    {selectedListing.prepared_at
+                      ? new Date(parseIsoDate(selectedListing.prepared_at)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : 'Recent'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block">Strict Safe Deadline</span>
+                  <span className="font-semibold text-rose-700">
+                    {selectedListing.safe_deadline
+                      ? new Date(parseIsoDate(selectedListing.safe_deadline)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : 'N/A'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pickup Node & Logistics Details */}
+            <div className="mb-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                  Pickup Coordinates:
+                </span>
+                <span className="font-mono font-semibold text-slate-800">
+                  {selectedListing.pickup_lat?.toFixed(4)}, {selectedListing.pickup_lng?.toFixed(4)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Delivery Mode:</span>
+                <span className="font-semibold text-slate-800 capitalize">
+                  {selectedListing.delivery_mode_offered?.replace('_', ' ') || 'Sender Vehicle'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Helping Contribution:</span>
+                <span className="font-bold text-emerald-700">
+                  {selectedListing.contribution_amount
+                    ? `~₹${selectedListing.contribution_amount} token fee`
+                    : '~₹50 token fee'}
+                </span>
               </div>
             </div>
 
@@ -1211,27 +1369,48 @@ export function NgoDashboard() {
               </div>
             )}
 
+            {/* Claim Lots Form */}
             <form onSubmit={handleSendRequest} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Lots to Request (Max: {selectedListing.available_lots})
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Lots to Request (Max: {selectedListing.available_lots})
+                  </label>
+                  <span className="text-xs font-extrabold text-purple-700">
+                    Total: {requestedLots * selectedListing.lot_size} meals
+                  </span>
+                </div>
+
+                <div className="flex items-center space-x-2 mb-2">
+                  {[1, 2, selectedListing.available_lots].filter((v, i, a) => v <= selectedListing.available_lots && a.indexOf(v) === i).map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setRequestedLots(num)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        requestedLots === num
+                          ? 'bg-purple-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {num === selectedListing.available_lots ? `All (${num})` : `${num} lot${num > 1 ? 's' : ''}`}
+                    </button>
+                  ))}
+                </div>
+
                 <input
                   type="number"
                   min="1"
                   max={selectedListing.available_lots}
                   required
                   value={requestedLots}
-                  onChange={(e) => setRequestedLots(Number(e.target.value))}
+                  onChange={(e) => setRequestedLots(Math.max(1, Math.min(selectedListing.available_lots, Number(e.target.value))))}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
-                <span className="text-xs text-slate-500 mt-1 block">
-                  Total meals: {requestedLots * selectedListing.lot_size} meals
-                </span>
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Delivery Preference
                 </label>
                 <select
@@ -1245,7 +1424,7 @@ export function NgoDashboard() {
               </div>
 
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
-                ℹ️ The restaurant will calculate food safety and send a 60-second confirmation offer with a nominal helping fee (~₹50) for you to accept.
+                ℹ️ The restaurant calculates food safety and sends a 60-second confirmation offer with a nominal helping fee (~₹50) for you to accept.
               </div>
 
               <div className="pt-2 flex items-center justify-end space-x-3">
@@ -1266,6 +1445,139 @@ export function NgoDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1B: VIEW FULL AUDIT DETAILS FOR HISTORICAL ORDER */}
+      {viewHistoryDetailsReq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 my-8 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    Order Audit Trail #{viewHistoryDetailsReq.id}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {viewHistoryDetailsReq.listing_name || 'Food Donation'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewHistoryDetailsReq(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 5-Stage Visual Pipeline */}
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                5-Stage Redistribution Pipeline
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-center text-[10px] font-bold">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-900">
+                  1. Request Sent
+                </div>
+                <div
+                  className={`p-2 rounded-xl ${
+                    ['offered', 'allocated', 'dispatched', 'completed'].includes(viewHistoryDetailsReq.status)
+                      ? 'bg-emerald-100 text-emerald-900'
+                      : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  2. Offered
+                </div>
+                <div
+                  className={`p-2 rounded-xl ${
+                    ['allocated', 'dispatched', 'completed'].includes(viewHistoryDetailsReq.status)
+                      ? 'bg-emerald-100 text-emerald-900'
+                      : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  3. Confirmed
+                </div>
+                <div
+                  className={`p-2 rounded-xl ${
+                    ['dispatched', 'completed'].includes(viewHistoryDetailsReq.status)
+                      ? 'bg-blue-100 text-blue-900'
+                      : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  4. Dispatched
+                </div>
+                <div
+                  className={`p-2 rounded-xl ${
+                    viewHistoryDetailsReq.status === 'completed'
+                      ? 'bg-emerald-100 text-emerald-900'
+                      : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  5. Handover Done
+                </div>
+              </div>
+            </div>
+
+            {/* Order Specification */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Restaurant:</span>
+                <span className="font-bold text-slate-800">
+                  {viewHistoryDetailsReq.provider_name || 'Taj Skyline Hotel'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Quantity Delivered:</span>
+                <span className="font-bold text-slate-800">
+                  {viewHistoryDetailsReq.allocated_lots || viewHistoryDetailsReq.requested_lots} lots (
+                  {(viewHistoryDetailsReq.allocated_lots || viewHistoryDetailsReq.requested_lots) * 10} meals)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Token Fee:</span>
+                <span className="font-bold text-emerald-700">₹{viewHistoryDetailsReq.nominal_price || 50}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Delivery Partner:</span>
+                <span className="font-semibold text-slate-700">
+                  {viewHistoryDetailsReq.partner_details || 'Electric Cargo Van #GJ-01-EV-4091'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-200/70">
+                <span className="text-slate-500">Handover OTP:</span>
+                <span className="font-mono font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  #{viewHistoryDetailsReq.otp_code || '749201'}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveChatRequest(viewHistoryDetailsReq)
+                  setChatFeedbackMode(false)
+                  setChatOpen(true)
+                  setViewHistoryDetailsReq(null)
+                }}
+                className="px-4 py-2 text-xs font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl flex items-center space-x-1.5 cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-purple-600" />
+                <span>Open Chat</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewHistoryDetailsReq(null)}
+                className="px-5 py-2 text-xs font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

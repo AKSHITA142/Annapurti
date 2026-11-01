@@ -124,17 +124,16 @@ export function App() {
             <span className="text-2xl font-black tracking-tight text-slate-900">
               Anna<span className="text-emerald-600">Purti</span>
             </span>
-            <span
-              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md border ${
-                isAdmin
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : isBoth
-                  ? 'bg-amber-50 text-amber-800 border-amber-200'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              }`}
-            >
-              {isAdmin ? 'Admin Operations' : isBoth ? 'Dual Workspace' : 'FoodRescue-AI'}
-            </span>
+            {isAdmin && (
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md border bg-blue-50 text-blue-700 border-blue-200">
+                Admin
+              </span>
+            )}
+            {isBoth && (
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md border bg-amber-50 text-amber-800 border-amber-200">
+                Dual Workspace
+              </span>
+            )}
           </div>
 
           {/* Navigation Tabs — Strict RBAC isolation */}

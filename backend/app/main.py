@@ -336,7 +336,8 @@ def health_check() -> Dict[str, Any]:
         db_status = f"unhealthy: {str(e)}"
 
     return {
-        "status": "online",
+        "status": "ok",
+        "state": "online",
         "app": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
@@ -349,6 +350,7 @@ def root() -> Dict[str, Any]:
     """Root endpoint providing service metadata."""
     return {
         "service": settings.PROJECT_NAME,
+        "message": f"Welcome to {settings.PROJECT_NAME} - FoodRescue-AI redistribution platform",
         "version": settings.VERSION,
         "docs": "/docs",
         "health": "/health",
