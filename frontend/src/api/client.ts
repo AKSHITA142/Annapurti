@@ -2,7 +2,10 @@ export interface User {
   id: number
   name: string
   email: string
-  role: 'provider' | 'ngo' | 'volunteer' | 'admin'
+  phone?: string
+  organization?: string
+  address?: string
+  role: 'provider' | 'ngo' | 'volunteer' | 'admin' | 'both'
   verified: boolean
   city: string
   lat?: number
@@ -35,11 +38,13 @@ export interface FoodListing {
   delivery_contribution_type: string
   contribution_amount: number
   status: 'active' | 'fully_reserved' | 'completed' | 'expired' | 'cancelled'
+  is_archived?: boolean
   created_at: string
   feasibility_badge?: 'feasible' | 'tight' | 'infeasible'
   journey_slack_minutes?: number
   spoilage_minutes_remaining?: number
   provider_name?: string
+  provider_email?: string
 }
 
 export interface DonationRequest {
@@ -63,6 +68,8 @@ export interface DonationRequest {
   delivery_job_status?: string
   otp_code?: string
   provider_name?: string
+  provider_email?: string
+  receiver_email?: string
   nominal_price?: number
   offer_seconds_remaining?: number
 }
@@ -171,7 +178,39 @@ export function getCurrentUser(): User | null {
   return currentUser
 }
 
+export function updateCurrentUser(updates: Partial<User>): User | null {
+  if (!currentUser) return null
+  currentUser = { ...currentUser, ...updates }
+  localStorage.setItem('foodrescue_user', JSON.stringify(currentUser))
+  return currentUser
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // If holding a temporary demo session token but backend is online, seamlessly upgrade to signed token
+  if (authToken && authToken.startsWith('demo-session-') && currentUser?.email && path !== '/auth/login') {
+    try {
+      const upgradeRes = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          name: currentUser.name,
+          role: currentUser.role,
+          lat: currentUser.lat || 23.0225,
+          lng: currentUser.lng || 72.5714,
+          city: currentUser.city || 'Ahmedabad',
+          address: currentUser.address,
+        }),
+      })
+      if (upgradeRes.ok) {
+        const upgradeData = await upgradeRes.json()
+        setSession(upgradeData.access_token, upgradeData.user)
+      }
+    } catch {
+      // Keep existing session if offline
+    }
+  }
+
   const headers = new Headers(options.headers || {})
   headers.set('Content-Type', 'application/json')
   if (authToken) {
@@ -182,6 +221,39 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers,
   })
+
+  // Automatic silent session recovery on 401 Unauthorized
+  if (response.status === 401 && currentUser?.email && path !== '/auth/login') {
+    try {
+      const reAuthRes = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          name: currentUser.name,
+          role: currentUser.role,
+          lat: currentUser.lat || 23.0225,
+          lng: currentUser.lng || 72.5714,
+          city: currentUser.city || 'Ahmedabad',
+          address: currentUser.address,
+        }),
+      })
+      if (reAuthRes.ok) {
+        const freshData = await reAuthRes.json()
+        setSession(freshData.access_token, freshData.user)
+        headers.set('Authorization', `Bearer ${freshData.access_token}`)
+        const retryRes = await fetch(`${API_BASE_URL}${path}`, {
+          ...options,
+          headers,
+        })
+        if (retryRes.ok) {
+          return retryRes.json()
+        }
+      }
+    } catch {
+      // standard handling below
+    }
+  }
 
   if (!response.ok) {
     let errorDetail = `Request failed: ${response.statusText}`
@@ -204,12 +276,24 @@ export async function fetchHealth() {
   return request<{ status: string; app: string; version: string; environment: string; database: string }>('/health')
 }
 
-export async function login(email: string, name?: string, role: string = 'ngo', lat: number = 23.0225, lng: number = 72.5714) {
+export async function login(
+  email: string,
+  name?: string,
+  role: string = 'ngo',
+  lat: number = 23.0225,
+  lng: number = 72.5714,
+  phone?: string,
+  organization?: string,
+  address?: string
+) {
   try {
     const data = await request<{ access_token: string; token_type: string; user: User }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, name, role, lat, lng, city: 'Ahmedabad' }),
+      body: JSON.stringify({ email, name, role, lat, lng, city: 'Ahmedabad', address }),
     })
+    if (phone) data.user.phone = phone
+    if (organization) data.user.organization = organization
+    if (address && !data.user.address) data.user.address = address
     setSession(data.access_token, data.user)
     return data
   } catch (err: any) {
@@ -217,27 +301,31 @@ export async function login(email: string, name?: string, role: string = 'ngo', 
     console.warn('Backend API unreachable, automatically falling back to offline demo session:', err)
     const getFallbackId = () => {
       if (role === 'admin') return 9
+      if (role === 'both') return 19
       if (role === 'provider') {
+        if (email.includes('donor.test')) return 17
         if (email.includes('taj.skyline')) return 10
         if (email.includes('taj.caterers')) return 1
-        if (email.includes('iscon')) return 2
-        return 11
+        return 17
       }
-      if (email.includes('apang')) return 6
+      if (email.includes('ngo.test')) return 18
+      if (email.includes('apang')) return 18
       if (email.includes('bpa')) return 12
-      if (email.includes('shishu')) return 7
-      return 8
+      return 18
     }
 
     const mockUser: User = {
       id: getFallbackId(),
-      name: name || (role === 'admin' ? 'City AMC Operations Admin' : role === 'provider' ? 'Taj Skyline Hotel' : 'Apang Manav Mandal Shelter'),
+      name: name || (role === 'admin' ? 'City AMC Operations Admin' : role === 'provider' ? 'Annapurna Restaurant & Caterers' : role === 'both' ? 'Community Food Hub' : 'Apang Manav Mandal Shelter'),
       email: email,
+      phone: phone || '+91 98765 43210',
+      organization: organization || name || (role === 'provider' ? 'Annapurna Restaurant & Caterers' : 'Apang Manav Mandal Shelter'),
+      address: address || (role === 'provider' ? 'CG Road, Navrangpura, Ahmedabad' : role === 'ngo' ? 'Drive In Road, Ahmedabad' : 'Maninagar, Ahmedabad'),
       role: role as any,
       verified: true,
       city: 'Ahmedabad',
-      lat: lat || 23.0225,
-      lng: lng || 72.5714,
+      lat: lat || (role === 'provider' ? 23.0300 : role === 'ngo' ? 23.0450 : 22.9940),
+      lng: lng || (role === 'provider' ? 72.5580 : role === 'ngo' ? 72.5270 : 72.6030),
       created_at: new Date().toISOString(),
     }
     const fallbackData = {
@@ -250,16 +338,123 @@ export async function login(email: string, name?: string, role: string = 'ngo', 
   }
 }
 
+export async function updateProfileApi(updates: {
+  name?: string
+  address?: string
+  lat?: number
+  lng?: number
+  city?: string
+}): Promise<User | null> {
+  try {
+    const updatedUser = await request<User>('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    })
+    updateCurrentUser(updatedUser)
+    return updatedUser
+  } catch (err) {
+    console.warn('Backend update failed or offline, updating local session:', err)
+    const local = updateCurrentUser(updates)
+    return local
+  }
+}
+
 export async function getMe() {
   return request<User>('/auth/me')
 }
 
 export async function getListings(category?: string, status?: string) {
-  const params = new URLSearchParams()
-  if (category) params.append('category', category)
-  if (status) params.append('status', status)
-  const qs = params.toString() ? `?${params.toString()}` : ''
-  return request<FoodListing[]>(`/listings${qs}`)
+  try {
+    const params = new URLSearchParams()
+    if (category) params.append('category', category)
+    if (status) params.append('status', status)
+    const qs = params.toString() ? `?${params.toString()}` : ''
+    const serverListings = await request<FoodListing[]>(`/listings${qs}`)
+
+    // Clean up or sync any offline created listings when server is online
+    try {
+      const stored = localStorage.getItem('foodrescue_offline_listings')
+      if (stored) {
+        const offlineList: FoodListing[] = JSON.parse(stored)
+        // Discard client-generated mock listings (id > 1000000000) that do not exist on the server
+        const validServerIds = new Set(serverListings.map((l) => l.id))
+        const remainingValid = offlineList.filter((l) => validServerIds.has(l.id))
+        if (remainingValid.length > 0) {
+          localStorage.setItem('foodrescue_offline_listings', JSON.stringify(remainingValid))
+        } else {
+          localStorage.removeItem('foodrescue_offline_listings')
+        }
+      }
+    } catch {}
+
+    try {
+      const deletedIds = new Set<number>(JSON.parse(localStorage.getItem('foodrescue_deleted_ids') || '[]'))
+      if (deletedIds.size > 0) {
+        return serverListings.filter((l) => !deletedIds.has(l.id))
+      }
+    } catch {}
+
+    return serverListings
+  } catch (err) {
+    console.warn('Backend offline or failed to fetch listings, serving cached listings:', err)
+    try {
+      const stored = localStorage.getItem('foodrescue_offline_listings')
+      return stored ? JSON.parse(stored) : []
+    } catch {
+      return []
+    }
+  }
+}
+
+export async function deleteListing(id: number): Promise<{ status: string; id: number }> {
+  try {
+    const result = await request<{ status: string; id: number }>(`/listings/${id}`, {
+      method: 'DELETE',
+    })
+    try {
+      const stored = localStorage.getItem('foodrescue_offline_listings')
+      if (stored) {
+        const list: FoodListing[] = JSON.parse(stored)
+        const filtered = list.filter((l) => l.id !== id)
+        localStorage.setItem('foodrescue_offline_listings', JSON.stringify(filtered))
+      }
+    } catch {}
+
+    try {
+      const deletedIds: number[] = JSON.parse(localStorage.getItem('foodrescue_deleted_ids') || '[]')
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id)
+        localStorage.setItem('foodrescue_deleted_ids', JSON.stringify(deletedIds))
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings', { detail: { id, deleted: true } }))
+    }
+    return result
+  } catch (err) {
+    try {
+      const stored = localStorage.getItem('foodrescue_offline_listings')
+      if (stored) {
+        const list: FoodListing[] = JSON.parse(stored)
+        const filtered = list.filter((l) => l.id !== id)
+        localStorage.setItem('foodrescue_offline_listings', JSON.stringify(filtered))
+      }
+    } catch {}
+
+    try {
+      const deletedIds: number[] = JSON.parse(localStorage.getItem('foodrescue_deleted_ids') || '[]')
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id)
+        localStorage.setItem('foodrescue_deleted_ids', JSON.stringify(deletedIds))
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings', { detail: { id, deleted: true } }))
+    }
+    return { status: 'deleted', id }
+  }
 }
 
 export async function getListing(id: number) {
@@ -282,17 +477,75 @@ export async function createListing(payload: {
   storage_requirement?: string
   delivery_mode_offered?: string
 }) {
-  return request<FoodListing>('/listings', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  })
+  try {
+    const result = await request<FoodListing>('/listings', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings', { detail: result }))
+    }
+    return result
+  } catch (err: any) {
+    console.warn('Backend unavailable or failed to create listing, storing in resilient local cache:', err)
+    const now = new Date()
+    const safeMins = payload.sender_declared_window_minutes || (payload.category === 'cooked_hot' ? 240 : 480)
+    const deadline = new Date(now.getTime() + safeMins * 60000).toISOString()
+    const mockListing: FoodListing = {
+      id: Date.now(),
+      provider_id: currentUser?.id || 1,
+      provider_name: currentUser?.name || 'Local Kitchen',
+      name: payload.name,
+      category: payload.category as any,
+      veg: payload.veg,
+      unit: payload.unit || 'meals',
+      lot_size: payload.lot_size || 10,
+      total_lots: payload.total_lots,
+      available_lots: payload.total_lots,
+      reserved_lots: 0,
+      collected_lots: 0,
+      delivered_lots: 0,
+      closed_lots: 0,
+      prepared_at: payload.prepared_at || now.toISOString(),
+      safe_deadline: deadline,
+      storage_requirement: payload.storage_requirement || 'ambient',
+      pickup_lat: payload.pickup_lat,
+      pickup_lng: payload.pickup_lng,
+      pickup_window_start: payload.pickup_window_start,
+      pickup_window_end: payload.pickup_window_end,
+      delivery_mode_offered: payload.delivery_mode_offered || 'sender_vehicle',
+      delivery_contribution_type: 'free',
+      contribution_amount: 0,
+      status: 'active',
+      created_at: now.toISOString(),
+      feasibility_badge: 'feasible',
+      journey_slack_minutes: safeMins - 25,
+      spoilage_minutes_remaining: safeMins,
+    }
+
+    try {
+      const stored = localStorage.getItem('foodrescue_offline_listings')
+      const list = stored ? JSON.parse(stored) : []
+      list.unshift(mockListing)
+      localStorage.setItem('foodrescue_offline_listings', JSON.stringify(list))
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings', { detail: mockListing }))
+    }
+    return mockListing
+  }
 }
 
 export async function createRequest(listingId: number, requestedLots: number) {
-  return request<DonationRequest>('/requests', {
+  const result = await request<DonationRequest>('/requests', {
     method: 'POST',
     body: JSON.stringify({ listing_id: listingId, requested_lots: requestedLots }),
   })
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('foodrescue:sync_listings', { detail: result }))
+  }
+  return result
 }
 
 export async function getMyRequests() {
@@ -300,6 +553,9 @@ export async function getMyRequests() {
 }
 
 export async function getDonorRequests() {
+  if (currentUser?.role && !['provider', 'admin', 'both'].includes(currentUser.role)) {
+    return []
+  }
   return request<DonationRequest[]>('/requests/donor')
 }
 

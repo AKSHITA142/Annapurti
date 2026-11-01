@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
 class ParseIntakeRequest(BaseModel):
@@ -77,10 +77,26 @@ class ListingResponse(BaseModel):
     delivery_contribution_type: str
     contribution_amount: float
     status: str
+    is_archived: bool = False
     created_at: datetime
     provider_name: Optional[str] = None
+    provider_email: Optional[str] = None
 
     # Feasibility and countdown badges (dynamic computed fields)
     feasibility_badge: Optional[str] = None  # feasible, tight, infeasible
     journey_slack_minutes: Optional[float] = None
     spoilage_minutes_remaining: Optional[float] = None
+
+    @field_serializer(
+        "prepared_at",
+        "safe_deadline",
+        "pickup_window_start",
+        "pickup_window_end",
+        "created_at",
+        when_used="json-unless-none",
+    )
+    def serialize_dt_utc(self, dt: datetime) -> str:
+        """Guarantee ISO 8601 string ending with Z so clients parse in UTC without timezone skew."""
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

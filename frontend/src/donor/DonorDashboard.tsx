@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import {
   ArrowUpRight,
   Clock,
+  CheckCircle2,
   ClipboardCheck,
   Layers,
   Plus,
   RefreshCw,
   Send,
+  Trash2,
   Truck,
   Utensils,
 } from 'lucide-react'
@@ -14,10 +16,12 @@ import {
   FoodListing,
   DonationRequest,
   createListing,
+  deleteListing,
   getListings,
   getDonorRequests,
   runAllocation,
   AllocationRunResponse,
+  getCurrentUser,
 } from '../api/client'
 import { SpoilageCountdown } from '../components/SpoilageCountdown'
 import { DonorOrdersManagementPanel } from '../components/DonorOrdersManagementPanel'
@@ -32,6 +36,7 @@ export function DonorDashboard() {
   const [listingFilter, setListingFilter] = useState<'active' | 'archive'>('active')
   const [workspaceTab, setWorkspaceTab] = useState<'inventory' | 'orders'>('inventory')
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
+  const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   // 1-second live clock for instant food safety spoilage removal
   useEffect(() => {
@@ -41,15 +46,21 @@ export function DonorDashboard() {
     return () => clearInterval(clock)
   }, [])
 
+  function parseIsoDate(isoStr?: string): number {
+    if (!isoStr) return 0
+    const normalized = isoStr.endsWith('Z') || isoStr.includes('+') ? isoStr : `${isoStr}Z`
+    return new Date(normalized).getTime()
+  }
+
   function isListingSpoiled(l: FoodListing): boolean {
     if (l.status === 'expired') return true
     if (l.spoilage_minutes_remaining !== undefined && l.spoilage_minutes_remaining <= 0) return true
-    const deadline = new Date(l.safe_deadline).getTime()
+    const deadline = parseIsoDate(l.safe_deadline)
     return currentTime >= deadline
   }
 
-  const activeSafeListings = listings.filter((l) => !isListingSpoiled(l) && l.status === 'active')
-  const archiveListings = listings.filter((l) => isListingSpoiled(l) || l.status !== 'active')
+  const activeSafeListings = listings.filter((l) => !l.is_archived && !isListingSpoiled(l) && l.status === 'active' && l.available_lots > 0)
+  const archiveListings = listings.filter((l) => !l.is_archived && (isListingSpoiled(l) || l.status !== 'active' || l.available_lots === 0))
   const availableMeals = activeSafeListings.reduce((total, listing) => total + listing.available_lots * listing.lot_size, 0)
   const reservedMeals = activeSafeListings.reduce((total, listing) => total + listing.reserved_lots * listing.lot_size, 0)
   const pendingRequests = donorRequests.filter((request) => request.status === 'pending' || request.status === 'reserved').length
@@ -59,6 +70,8 @@ export function DonorDashboard() {
   const [parsingIntake, setParsingIntake] = useState(false)
   const [intakeParsedNote, setIntakeParsedNote] = useState<string | null>(null)
 
+  const currentUser = getCurrentUser()
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -66,8 +79,8 @@ export function DonorDashboard() {
     veg: true,
     lot_size: 10,
     total_lots: 5,
-    pickup_lat: 23.0225,
-    pickup_lng: 72.5714,
+    pickup_lat: currentUser?.lat || 23.0225,
+    pickup_lng: currentUser?.lng || 72.5714,
     sender_declared_window_minutes: 240,
     storage_requirement: 'ambient',
     delivery_mode_offered: 'sender_vehicle',
@@ -91,6 +104,22 @@ export function DonorDashboard() {
 
   useEffect(() => {
     loadData()
+
+    // Real-time synchronization listener across tabs/components
+    const handleSync = () => {
+      loadData()
+    }
+    window.addEventListener('foodrescue:sync_listings', handleSync)
+
+    // Polling interval for live sync across active devices (every 3 seconds)
+    const interval = setInterval(() => {
+      loadData()
+    }, 3000)
+
+    return () => {
+      window.removeEventListener('foodrescue:sync_listings', handleSync)
+      clearInterval(interval)
+    }
   }, [])
 
   async function handleParseIntake() {
@@ -111,7 +140,7 @@ export function DonorDashboard() {
       })
 
       if (!res.ok) {
-        throw new Error('Failed to parse intake text')
+        throw new Error('Server parse unavailable')
       }
 
       const data = await res.json()
@@ -128,8 +157,29 @@ export function DonorDashboard() {
       setIntakeParsedNote(
         `Parsed successfully: ${data.name} (${data.total_lots} lots, ${data.category}, ${data.veg ? 'Veg' : 'Non-veg'}). Please review parameters below before publishing.`
       )
-    } catch (err: any) {
-      alert(`Could not parse text: ${err.message}`)
+    } catch {
+      // Offline / resilient smart parser fallback
+      const isVeg = !/\b(non-?veg|chicken|meat|egg|fish|mutton|pork|beef)\b/i.test(plainInputText)
+      const numMatch = plainInputText.match(/(\d+)\s*(lots?|boxes?|packets?|trays?|portions?|meals?|thali)/i)
+      const extractedLots = numMatch ? Math.max(1, parseInt(numMatch[1], 10)) : 5
+      const cleanName = plainInputText
+        .replace(/\b(made at|pickup till|pickup by|pm|am|hours?|lots?|boxes?)\b.*$/i, '')
+        .trim()
+
+      const parsedName = cleanName || 'Cooked Surplus Meal'
+      setFormData((prev) => ({
+        ...prev,
+        name: parsedName,
+        category: 'cooked_hot',
+        veg: isVeg,
+        lot_size: 10,
+        total_lots: extractedLots,
+        sender_declared_window_minutes: 240,
+        storage_requirement: 'ambient',
+      }))
+      setIntakeParsedNote(
+        `Smart parsed: ${parsedName} (${extractedLots} lots, Cooked Hot, ${isVeg ? 'Veg' : 'Non-Veg'}). Please review parameters below.`
+      )
     } finally {
       setParsingIntake(false)
     }
@@ -137,46 +187,93 @@ export function DonorDashboard() {
 
   async function handleCreateListing(e: React.FormEvent) {
     e.preventDefault()
+    if (!formData.name.trim()) {
+      alert('Please enter a food item name.')
+      return
+    }
     setSubmitting(true)
     try {
       const now = new Date()
       const pickupStart = new Date(now.getTime() + 10 * 60000)
       const pickupEnd = new Date(now.getTime() + 120 * 60000)
 
+      const activeUser = getCurrentUser()
+
       await createListing({
-        name: formData.name,
+        name: formData.name.trim(),
         category: formData.category,
         veg: formData.veg,
-        lot_size: Number(formData.lot_size),
-        total_lots: Number(formData.total_lots),
+        lot_size: Number(formData.lot_size) || 10,
+        total_lots: Number(formData.total_lots) || 1,
         prepared_at: now.toISOString(),
-        pickup_lat: formData.pickup_lat,
-        pickup_lng: formData.pickup_lng,
+        pickup_lat: formData.pickup_lat || activeUser?.lat || 23.0225,
+        pickup_lng: formData.pickup_lng || activeUser?.lng || 72.5714,
         pickup_window_start: pickupStart.toISOString(),
         pickup_window_end: pickupEnd.toISOString(),
-        sender_declared_window_minutes: Number(formData.sender_declared_window_minutes),
-        storage_requirement: formData.storage_requirement,
-        delivery_mode_offered: formData.delivery_mode_offered,
+        sender_declared_window_minutes: Number(formData.sender_declared_window_minutes) || 240,
+        storage_requirement: formData.storage_requirement || 'ambient',
+        delivery_mode_offered: formData.delivery_mode_offered || 'sender_vehicle',
       })
 
       setShowCreateModal(false)
+      setPlainInputText('')
+      setIntakeParsedNote(null)
       setFormData({
         name: '',
         category: 'cooked_hot',
         veg: true,
         lot_size: 10,
         total_lots: 5,
-        pickup_lat: 23.0225,
-        pickup_lng: 72.5714,
+        pickup_lat: activeUser?.lat || 23.0225,
+        pickup_lng: activeUser?.lng || 72.5714,
         sender_declared_window_minutes: 240,
         storage_requirement: 'ambient',
         delivery_mode_offered: 'sender_vehicle',
       })
+
+      setActionNotice({ text: 'Food listing published successfully to surplus inventory!', type: 'success' })
+      setTimeout(() => setActionNotice(null), 5000)
+
+      // Dispatch global sync event to instantly update NGO marketplace and other views
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       await loadData()
     } catch (err: any) {
-      alert(`Error creating listing: ${err.message}`)
+      alert(`Could not create listing: ${err.message}`)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDeleteListing(id: number) {
+    if (!window.confirm('Are you sure you want to permanently delete this archived listing? This action cannot be undone.')) {
+      return
+    }
+    try {
+      setListings((prev) => prev.filter((l) => l.id !== id))
+      await deleteListing(id)
+      setActionNotice({ text: 'Archived listing permanently deleted.', type: 'success' })
+      loadData()
+    } catch (err: any) {
+      console.error('Failed to delete listing', err)
+      setActionNotice({ text: err.message || 'Failed to delete listing', type: 'error' })
+      loadData()
+    }
+  }
+
+  async function handleRemoveActiveListing(id: number, name: string) {
+    if (!window.confirm(`Are you sure you want to remove "${name}" from the active portal? This will unpublish the food batch immediately.`)) {
+      return
+    }
+    try {
+      setListings((prev) => prev.filter((l) => l.id !== id))
+      await deleteListing(id)
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
+      setActionNotice({ text: `Food batch "${name}" was successfully removed from the portal.`, type: 'success' })
+      loadData()
+    } catch (err: any) {
+      console.error('Failed to remove listing', err)
+      setActionNotice({ text: err.message || 'Failed to remove listing', type: 'error' })
+      loadData()
     }
   }
 
@@ -193,10 +290,22 @@ export function DonorDashboard() {
           `Allocation finished with partial feasibility. Repaired rounds: ${result.repair_rounds_run}. Check Admin Explain View.`
         )
       }
+      // Real-time synchronization
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       await loadData()
     } catch (err: any) {
       setAllocationStatus(`Allocation error: ${err.message}`)
     }
+  }
+
+  function openCreateModalWithLatestCoords() {
+    const activeUser = getCurrentUser()
+    setFormData((prev) => ({
+      ...prev,
+      pickup_lat: activeUser?.lat || prev.pickup_lat,
+      pickup_lng: activeUser?.lng || prev.pickup_lng,
+    }))
+    setShowCreateModal(true)
   }
 
   return (
@@ -227,7 +336,7 @@ export function DonorDashboard() {
           </button>
 
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={openCreateModalWithLatestCoords}
             className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -241,6 +350,20 @@ export function DonorDashboard() {
         <DashboardMetric icon={<Utensils className="w-5 h-5" />} label="Meals available" value={availableMeals.toLocaleString()} detail={`${reservedMeals.toLocaleString()} meals reserved`} tone="orange" />
         <DashboardMetric icon={<ClipboardCheck className="w-5 h-5" />} label="Actions needed" value={pendingRequests.toString()} detail={pendingRequests ? 'Claims waiting for review' : 'No outstanding claims'} tone="blue" />
       </section>
+
+      {actionNotice && (
+        <div className={`p-4 rounded-2xl border flex items-center justify-between text-sm shadow-xs ${
+          actionNotice.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+        }`}>
+          <div className="flex items-center space-x-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span className="font-semibold">{actionNotice.text}</span>
+          </div>
+          <button onClick={() => setActionNotice(null)} className="text-xs font-bold text-slate-500 hover:text-slate-800">
+            ✕
+          </button>
+        </div>
+      )}
 
       {allocationStatus && (
         <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-sm flex items-center justify-between">
@@ -376,7 +499,7 @@ export function DonorDashboard() {
               </p>
               {listingFilter === 'active' && (
                 <button
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={openCreateModalWithLatestCoords}
                   className="mt-4 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 cursor-pointer"
                 >
                   Post Surplus Food
@@ -436,13 +559,22 @@ export function DonorDashboard() {
                   </div>
 
                   {/* Lot Inventory Breakdown */}
-                  <div className="space-y-2.5 text-xs">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Total Inventory:</span>
-                      <span className="font-bold text-slate-800">
-                        {l.total_lots} lots ({l.total_lots * l.lot_size} {l.unit})
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-slate-700">
+                      <span className="font-medium">Remaining Available:</span>
+                      <span className="font-extrabold text-emerald-700 text-sm">
+                        {l.available_lots} of {l.total_lots} lots ({l.available_lots * l.lot_size} {l.unit})
                       </span>
                     </div>
+
+                    {l.total_lots - l.available_lots > 0 && (
+                      <div className="flex justify-between items-center text-[11px] text-amber-900 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                        <span className="font-medium">Purchased / Claimed:</span>
+                        <span className="font-black">
+                          -{l.total_lots - l.available_lots} lots ({(l.total_lots - l.available_lots) * l.lot_size} {l.unit})
+                        </span>
+                      </div>
+                    )}
 
                     {/* Visual Inventory Bar */}
                     <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex ring-1 ring-inset ring-slate-200/60">
@@ -490,13 +622,37 @@ export function DonorDashboard() {
                   <span className="text-xs text-slate-400">
                     ID #{l.id} • {new Date(l.created_at).toLocaleDateString()}
                   </span>
-                  <button
-                    onClick={() => handleTriggerAllocation(l.id)}
-                    className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Allocate</span><ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {listingFilter === 'active' && (
+                      <button
+                        onClick={() => handleRemoveActiveListing(l.id, l.name)}
+                        className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer border border-rose-200"
+                        title="Remove this food batch from the public portal"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    )}
+                    {listingFilter === 'archive' && (
+                      <button
+                        onClick={() => handleDeleteListing(l.id)}
+                        className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer border border-rose-200"
+                        title="Permanently delete from archive"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    )}
+                    {listingFilter === 'active' && (
+                      <button
+                        onClick={() => handleTriggerAllocation(l.id)}
+                        className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Allocate</span><ArrowUpRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

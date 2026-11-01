@@ -20,3 +20,47 @@ class DecisionLog(Base):
     message = Column(Text, nullable=False)  # Human-readable sentence
     payload = Column(JSON, default=dict, nullable=False)  # Additional machine-readable structured details
 
+
+class InventoryLog(Base):
+    __tablename__ = "inventory_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, nullable=False, index=True)
+    action = Column(String(50), nullable=False)  # created, reserved, released, allocated, delivered, expired, archived, deleted
+    previous_status = Column(String(50), nullable=True)
+    new_status = Column(String(50), nullable=False)
+    available_lots = Column(Integer, nullable=False)
+    reserved_lots = Column(Integer, nullable=False)
+    note = Column(Text, nullable=True)
+    timestamp = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    @staticmethod
+    def log(
+        db,
+        listing_id: int,
+        action: str,
+        new_status: str,
+        available_lots: int,
+        reserved_lots: int,
+        previous_status: str = None,
+        note: str = None,
+    ):
+        """Helper to safely record an inventory state transition audit log."""
+        try:
+            entry = InventoryLog(
+                listing_id=listing_id,
+                action=action,
+                previous_status=previous_status,
+                new_status=new_status,
+                available_lots=available_lots,
+                reserved_lots=reserved_lots,
+                note=note,
+                timestamp=datetime.now(timezone.utc),
+            )
+            db.add(entry)
+        except Exception:
+            pass

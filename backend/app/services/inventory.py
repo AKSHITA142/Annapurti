@@ -7,7 +7,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from app.models.listing import FoodListing
 from app.models.request import DonationRequest
-from app.models.log import DecisionLog
+from app.models.log import DecisionLog, InventoryLog
 
 # Process-level reentrant lock for thread safety across concurrent requests
 _inventory_lock = threading.RLock()
@@ -170,6 +170,16 @@ class InventoryService:
                             },
                         )
                     )
+                    InventoryLog.log(
+                        db=db,
+                        listing_id=listing_id,
+                        action="reserved",
+                        previous_status="active",
+                        new_status=listing.status,
+                        available_lots=listing.available_lots,
+                        reserved_lots=listing.reserved_lots,
+                        note=f"Reserved {lots} lots for request #{request_id} ({listing.available_lots} lots remaining)",
+                    )
 
                     db.commit()
                     return True
@@ -206,7 +216,7 @@ class InventoryService:
                 .first()
             )
 
-            if not request or request.status not in ("reserved", "allocated"):
+            if not request or request.status not in ("reserved", "allocated", "offered"):
                 return False
 
             listing = (
@@ -297,7 +307,7 @@ class InventoryService:
                 .first()
             )
 
-            if not request or request.status not in ("reserved", "allocated"):
+            if not request or request.status not in ("reserved", "allocated", "offered"):
                 return False
 
             listing = (
@@ -464,6 +474,16 @@ class InventoryService:
                             message=f"Listing {l.id} ({l.name}) automatically purged past safety deadline ({l.safe_deadline}). Available lots moved to closed.",
                             payload={"listing_id": l.id, "closed_lots": unallocated},
                         )
+                    )
+                    InventoryLog.log(
+                        db=db,
+                        listing_id=l.id,
+                        action="expired",
+                        previous_status="active",
+                        new_status="expired",
+                        available_lots=0,
+                        reserved_lots=l.reserved_lots,
+                        note=f"Listing automatically expired past safe deadline ({l.safe_deadline}). {unallocated} unallocated lots closed.",
                     )
 
             if expired_count > 0:

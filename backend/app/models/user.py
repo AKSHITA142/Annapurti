@@ -13,6 +13,7 @@ class User(Base):
     role = Column(String(50), nullable=False)  # provider, ngo, volunteer, admin
     verified = Column(Boolean, default=False, nullable=False)
     city = Column(String(100), default="Ahmedabad", nullable=False)
+    address = Column(String(500), nullable=True)
     lat = Column(Float, nullable=True)
     lng = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -38,4 +39,3 @@ class ReceiverProfile(Base):
     priority_class = Column(String(50), default="standard", nullable=False)  # shelter, orphanage, community_kitchen, standard
 
     user = relationship("User", back_populates="receiver_profile")
-
