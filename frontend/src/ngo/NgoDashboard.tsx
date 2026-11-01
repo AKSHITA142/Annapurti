@@ -169,6 +169,24 @@ export function NgoDashboard() {
   // Active incoming 60s offer from donor
   const activeOffer = myRequests.find((r) => r.status === 'offered')
 
+  // Live countdown for incoming offer: if receiver does not confirm before timer hits 1s or 0s, auto-decline
+  useEffect(() => {
+    if (!activeOffer) {
+      setOfferCountdown(59)
+      return
+    }
+    const timer = setInterval(() => {
+      setOfferCountdown((prev) => {
+        if (prev <= 1) {
+          handleDeclineOffer(activeOffer.id)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [activeOffer?.id])
+
   // Step 4A: Active allocated order (NGO accepted offer; waiting for SENDER to dispatch vehicle)
   const activeAllocatedOrder = myRequests.find(
     (r) =>

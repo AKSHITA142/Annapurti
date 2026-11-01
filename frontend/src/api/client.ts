@@ -371,14 +371,19 @@ export async function getListings(category?: string, status?: string) {
     const qs = params.toString() ? `?${params.toString()}` : ''
     const serverListings = await request<FoodListing[]>(`/listings${qs}`)
 
-    // Merge any offline created listings that are not yet on the server
+    // Clean up or sync any offline created listings when server is online
     try {
       const stored = localStorage.getItem('foodrescue_offline_listings')
       if (stored) {
         const offlineList: FoodListing[] = JSON.parse(stored)
-        const existingIds = new Set(serverListings.map((l) => l.id))
-        const unmerged = offlineList.filter((l) => !existingIds.has(l.id))
-        return [...unmerged, ...serverListings]
+        // Discard client-generated mock listings (id > 1000000000) that do not exist on the server
+        const validServerIds = new Set(serverListings.map((l) => l.id))
+        const remainingValid = offlineList.filter((l) => validServerIds.has(l.id))
+        if (remainingValid.length > 0) {
+          localStorage.setItem('foodrescue_offline_listings', JSON.stringify(remainingValid))
+        } else {
+          localStorage.removeItem('foodrescue_offline_listings')
+        }
       }
     } catch {}
 
@@ -548,6 +553,9 @@ export async function getMyRequests() {
 }
 
 export async function getDonorRequests() {
+  if (currentUser?.role && !['provider', 'admin', 'both'].includes(currentUser.role)) {
+    return []
+  }
   return request<DonationRequest[]>('/requests/donor')
 }
 

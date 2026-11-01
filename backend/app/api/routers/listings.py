@@ -162,8 +162,8 @@ def get_listings(
         if current_user and current_user.role in ("provider", "both", "admin"):
             pass
         else:
-            # For NGOs and public marketplace: strictly active safe listings with future deadline
-            query = query.filter(FoodListing.status == "active", FoodListing.safe_deadline > now)
+            # For NGOs and public marketplace: strictly active safe listings with remaining available lots and future deadline
+            query = query.filter(FoodListing.status == "active", FoodListing.available_lots > 0, FoodListing.safe_deadline > now)
 
     listings = query.order_by(FoodListing.created_at.desc()).all()
 

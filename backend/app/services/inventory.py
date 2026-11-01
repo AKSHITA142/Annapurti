@@ -216,7 +216,7 @@ class InventoryService:
                 .first()
             )
 
-            if not request or request.status not in ("reserved", "allocated"):
+            if not request or request.status not in ("reserved", "allocated", "offered"):
                 return False
 
             listing = (
@@ -307,7 +307,7 @@ class InventoryService:
                 .first()
             )
 
-            if not request or request.status not in ("reserved", "allocated"):
+            if not request or request.status not in ("reserved", "allocated", "offered"):
                 return False
 
             listing = (

@@ -59,8 +59,8 @@ export function DonorDashboard() {
     return currentTime >= deadline
   }
 
-  const activeSafeListings = listings.filter((l) => !l.is_archived && !isListingSpoiled(l) && (l.status === 'active' || l.status === 'fully_reserved'))
-  const archiveListings = listings.filter((l) => !l.is_archived && (isListingSpoiled(l) || (l.status !== 'active' && l.status !== 'fully_reserved')))
+  const activeSafeListings = listings.filter((l) => !l.is_archived && !isListingSpoiled(l) && l.status === 'active' && l.available_lots > 0)
+  const archiveListings = listings.filter((l) => !l.is_archived && (isListingSpoiled(l) || l.status !== 'active' || l.available_lots === 0))
   const availableMeals = activeSafeListings.reduce((total, listing) => total + listing.available_lots * listing.lot_size, 0)
   const reservedMeals = activeSafeListings.reduce((total, listing) => total + listing.reserved_lots * listing.lot_size, 0)
   const pendingRequests = donorRequests.filter((request) => request.status === 'pending' || request.status === 'reserved').length
@@ -256,6 +256,23 @@ export function DonorDashboard() {
     } catch (err: any) {
       console.error('Failed to delete listing', err)
       setActionNotice({ text: err.message || 'Failed to delete listing', type: 'error' })
+      loadData()
+    }
+  }
+
+  async function handleRemoveActiveListing(id: number, name: string) {
+    if (!window.confirm(`Are you sure you want to remove "${name}" from the active portal? This will unpublish the food batch immediately.`)) {
+      return
+    }
+    try {
+      setListings((prev) => prev.filter((l) => l.id !== id))
+      await deleteListing(id)
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
+      setActionNotice({ text: `Food batch "${name}" was successfully removed from the portal.`, type: 'success' })
+      loadData()
+    } catch (err: any) {
+      console.error('Failed to remove listing', err)
+      setActionNotice({ text: err.message || 'Failed to remove listing', type: 'error' })
       loadData()
     }
   }
@@ -606,6 +623,16 @@ export function DonorDashboard() {
                     ID #{l.id} • {new Date(l.created_at).toLocaleDateString()}
                   </span>
                   <div className="flex items-center space-x-2">
+                    {listingFilter === 'active' && (
+                      <button
+                        onClick={() => handleRemoveActiveListing(l.id, l.name)}
+                        className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer border border-rose-200"
+                        title="Remove this food batch from the public portal"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    )}
                     {listingFilter === 'archive' && (
                       <button
                         onClick={() => handleDeleteListing(l.id)}

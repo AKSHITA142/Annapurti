@@ -11,13 +11,14 @@ import {
   MessageSquare,
   Info,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import {
   DonationRequest,
   rejectRequest,
   sendDonorOffer,
   dispatchOrder,
-  completeDelivery,
 } from '../api/client'
 import { DonorNgoChatModal } from './DonorNgoChatModal'
 
@@ -39,6 +40,8 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
   onRefresh,
 }) => {
   const [filter, setFilter] = useState<'pending' | 'in_transit' | 'completed'>('pending')
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const ITEMS_PER_PAGE = 4
   const [countdown, setCountdown] = useState<number>(58)
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -103,7 +106,13 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
     })
 
     if (newNotifications.length > 0) {
-      setNotifications((prev) => [...newNotifications, ...prev])
+      setNotifications((prev) => {
+        const existingKeys = new Set(prev.map((n) => n.id.split('-').slice(0, 2).join('-')))
+        const unique = newNotifications.filter(
+          (n) => !existingKeys.has(n.id.split('-').slice(0, 2).join('-'))
+        )
+        return [...unique, ...prev]
+      })
     }
   }, [requests])
 
@@ -129,16 +138,55 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
     }
   }, [onRefresh])
 
+  const [offerTimers, setOfferTimers] = useState<Record<number, number>>({})
+
+  // Auto-expire unconfirmed offers: if receiver does not confirm within countdown (hits 1s or 0s), auto-remove card
+  useEffect(() => {
+    const offeredList = requests.filter((r) => r.status === 'offered')
+    if (offeredList.length === 0) return
+
+    setOfferTimers((prev) => {
+      const next = { ...prev }
+      offeredList.forEach((r) => {
+        if (next[r.id] === undefined) {
+          next[r.id] = 60
+        }
+      })
+      return next
+    })
+
+    const interval = setInterval(() => {
+      setOfferTimers((prev) => {
+        const next = { ...prev }
+        offeredList.forEach((r) => {
+          const timeLeft = next[r.id] !== undefined ? next[r.id] : 60
+          if (timeLeft <= 1) {
+            // Unconfirmed offer expired after 1s: automatically decline and remove from donor dashboard
+            handleReject(r.id)
+            delete next[r.id]
+          } else {
+            next[r.id] = timeLeft - 1
+          }
+        })
+        return next
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [requests])
+
   // Partition requests by status
   const pendingRequests = requests.filter(
     (r) => r.status === 'pending' || r.status === 'reserved' || r.status === 'offered'
   )
   const inTransitRequests = requests.filter(
     (r) =>
-      r.status === 'allocated' ||
-      r.status === 'dispatched' ||
-      r.delivery_job_status === 'assigned' ||
-      r.delivery_job_status === 'in_transit'
+      r.status !== 'completed' &&
+      r.delivery_job_status !== 'delivered' &&
+      (r.status === 'allocated' ||
+        r.status === 'dispatched' ||
+        r.delivery_job_status === 'assigned' ||
+        r.delivery_job_status === 'in_transit')
   )
   const completedRequests = requests.filter(
     (r) => r.status === 'completed' || r.delivery_job_status === 'delivered'
@@ -150,6 +198,13 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
       : filter === 'in_transit'
       ? inTransitRequests
       : completedRequests
+
+  const totalPages = Math.max(1, Math.ceil(activeList.length / ITEMS_PER_PAGE))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedList = activeList.slice(
+    (safePage - 1) * ITEMS_PER_PAGE,
+    safePage * ITEMS_PER_PAGE
+  )
 
   async function handleSendOffer(requestId: number) {
     setActionLoadingId(requestId)
@@ -169,52 +224,13 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
   async function handleDispatch(requestId: number) {
     setActionLoadingId(requestId)
     setNotice(null)
-    const target = requests.find((r) => r.id === requestId)
     try {
       await dispatchOrder(requestId)
       setNotice('🚚 Delivery partner dispatched! Electric Cargo Van #GJ-01-EV-4091 is now on the way to the receiver.')
-      setNotifications((prev) => [
-        {
-          id: `dispatch-manual-${requestId}-${Date.now()}`,
-          title: `Order #${requestId} Dispatched & In Transit!`,
-          message: `Electric Cargo Van #GJ-01-EV-4091 is now en route with "${target?.listing_name || 'Food'}" to ${target?.receiver_name || 'receiver'}!`,
-          type: 'dispatch',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-        ...prev,
-      ])
       window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } catch {
       setNotice('🚚 Delivery partner dispatched! Electric Cargo Van #GJ-01-EV-4091 is now on the way to the receiver.')
-      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
-      onRefresh()
-    } finally {
-      setActionLoadingId(null)
-    }
-  }
-
-  async function handleCompleteDelivery(requestId: number) {
-    setActionLoadingId(requestId)
-    setNotice(null)
-    const target = requests.find((r) => r.id === requestId)
-    try {
-      await completeDelivery(requestId)
-      setNotice('✅ Delivery completed & verified! Handover OTP #749201 validated.')
-      setNotifications((prev) => [
-        {
-          id: `delivered-manual-${requestId}-${Date.now()}`,
-          title: `Order #${requestId} Handover Delivered & Verified!`,
-          message: `Delivery completed and verified by ${target?.receiver_name || 'receiver'} with OTP #${target?.otp_code || '749201'}!`,
-          type: 'delivered',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-        ...prev,
-      ])
-      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
-      onRefresh()
-    } catch {
-      setNotice('✅ Delivery completed & verified! Handover OTP #749201 validated.')
       window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } finally {
@@ -340,7 +356,10 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => setFilter('pending')}
+            onClick={() => {
+              setFilter('pending')
+              setCurrentPage(1)
+            }}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 cursor-pointer ${
               filter === 'pending'
                 ? 'bg-amber-600 text-white shadow-xs'
@@ -354,7 +373,10 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
           </button>
 
           <button
-            onClick={() => setFilter('in_transit')}
+            onClick={() => {
+              setFilter('in_transit')
+              setCurrentPage(1)
+            }}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 cursor-pointer ${
               filter === 'in_transit'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -368,7 +390,10 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
           </button>
 
           <button
-            onClick={() => setFilter('completed')}
+            onClick={() => {
+              setFilter('completed')
+              setCurrentPage(1)
+            }}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 cursor-pointer ${
               filter === 'completed'
                 ? 'bg-emerald-600 text-white shadow-xs'
@@ -402,7 +427,7 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
 
       {/* 4. Orders Cards Grid - Compact, Clean Outer Card */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {activeList.map((req) => (
+        {paginatedList.map((req) => (
           <div
             key={req.id}
             onClick={() => setSelectedDonorOrder(req)}
@@ -467,19 +492,21 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
                   </div>
                 )}
                 {req.status === 'offered' && (
-                  <div className="p-2.5 rounded-xl bg-amber-100 border border-amber-300 text-xs font-semibold text-amber-900 flex items-center justify-between animate-pulse">
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-xs font-semibold text-amber-900 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-amber-700" />
-                      60s Offer Sent to NGO
+                      <Clock className="w-3.5 h-3.5 text-amber-700 animate-spin" />
+                      Offer Sent • Waiting for Receiver Confirmation
                     </span>
-                    <span className="text-[10px] font-mono font-bold">Active 60s</span>
+                    <span className="text-[11px] font-mono font-black text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-lg border border-amber-300">
+                      00:{(offerTimers[req.id] !== undefined ? offerTimers[req.id] : 60).toString().padStart(2, '0')}s
+                    </span>
                   </div>
                 )}
                 {req.status === 'allocated' && (
                   <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      Confirmed by NGO • Ready to Dispatch
+                      Confirmed by Receiver! Ready to Dispatch
                     </span>
                     <span className="text-[10px] font-mono">OTP: #{req.otp_code || '749201'}</span>
                   </div>
@@ -491,7 +518,7 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
                       In Transit • Electric Cargo Van #GJ-01-EV-4091
                     </span>
                     <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono">
-                      En Route
+                      En Route (Awaiting Receiver Confirmation)
                     </span>
                   </div>
                 )}
@@ -533,6 +560,18 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
                   </button>
                 )}
 
+                {req.status === 'offered' && (
+                  <button
+                    onClick={() => handleReject(req.id)}
+                    disabled={actionLoadingId === req.id}
+                    className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center space-x-1 transition-all cursor-pointer"
+                    title="Withdraw unconfirmed offer"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Cancel Offer</span>
+                  </button>
+                )}
+
                 {req.status === 'allocated' && (
                   <button
                     onClick={() => handleDispatch(req.id)}
@@ -545,14 +584,10 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
                 )}
 
                 {(req.status === 'dispatched' || req.delivery_job_status === 'in_transit') && (
-                  <button
-                    onClick={() => handleCompleteDelivery(req.id)}
-                    disabled={actionLoadingId === req.id}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center space-x-1 shadow-2xs transition-all cursor-pointer"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Confirm Handover</span>
-                  </button>
+                  <div className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold flex items-center space-x-1.5">
+                    <Truck className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                    <span>En Route • Awaiting Receiver Confirmation</span>
+                  </div>
                 )}
 
                 {req.status === 'completed' && (
@@ -572,6 +607,56 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-200">
+          <span className="text-xs text-slate-500">
+            Showing <strong className="text-slate-800">{(safePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(safePage * ITEMS_PER_PAGE, activeList.length)}</strong> of <strong className="text-slate-800">{activeList.length}</strong> orders
+          </span>
+
+          <div className="flex items-center space-x-2 self-center sm:self-auto">
+            <button
+              type="button"
+              disabled={safePage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1 cursor-pointer transition-colors"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Prev</span>
+            </button>
+
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pg) => (
+                <button
+                  key={pg}
+                  type="button"
+                  onClick={() => setCurrentPage(pg)}
+                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    pg === safePage
+                      ? filter === 'completed'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'bg-[#0F382A] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {pg}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              disabled={safePage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1 cursor-pointer transition-colors"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating Chat Trigger for Quick Coordination */}
       <div className="fixed bottom-6 right-6 z-40">
@@ -745,6 +830,30 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
                 </div>
               )}
 
+              {selectedDonorOrder.status === 'offered' && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-amber-900">
+                    <span className="font-semibold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-700 animate-spin" />
+                      Waiting for receiver confirmation
+                    </span>
+                    <span className="font-mono font-bold bg-amber-200/80 px-2 py-0.5 rounded border border-amber-300">
+                      00:{(offerTimers[selectedDonorOrder.id] !== undefined ? offerTimers[selectedDonorOrder.id] : 60).toString().padStart(2, '0')}s
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleReject(selectedDonorOrder.id)
+                      setSelectedDonorOrder(null)
+                    }}
+                    disabled={actionLoadingId === selectedDonorOrder.id}
+                    className="w-full py-2 px-3 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Withdraw / Cancel Offer
+                  </button>
+                </div>
+              )}
+
               {selectedDonorOrder.status === 'allocated' && (
                 <button
                   onClick={() => {
@@ -760,17 +869,15 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
               )}
 
               {(selectedDonorOrder.status === 'dispatched' || selectedDonorOrder.delivery_job_status === 'in_transit') && (
-                <button
-                  onClick={() => {
-                    handleCompleteDelivery(selectedDonorOrder.id)
-                    setSelectedDonorOrder(null)
-                  }}
-                  disabled={actionLoadingId === selectedDonorOrder.id}
-                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-sm transition-all cursor-pointer"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Confirm Final Handover (OTP: #{selectedDonorOrder.otp_code || '749201'})</span>
-                </button>
+                <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-start space-x-2.5">
+                  <Truck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Delivery Partner En Route (Electric Cargo Van)</span>
+                    <span className="text-blue-700 text-[11px] block mt-0.5">
+                      Food is out for delivery. Only the receiving shelter will verify food arrival and confirm the handover OTP upon doorstep arrival.
+                    </span>
+                  </div>
+                </div>
               )}
 
               <button
