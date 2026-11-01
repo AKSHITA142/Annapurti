@@ -231,6 +231,12 @@ def confirm_request(
     listing = db.query(FoodListing).filter(FoodListing.id == req.listing_id).first()
     if not listing:
         listing = db.query(FoodListing).first()
+    elif req.requested_lots > 0:
+        if listing.available_lots >= req.requested_lots and listing.reserved_lots < req.requested_lots:
+            listing.available_lots -= req.requested_lots
+            listing.reserved_lots += req.requested_lots
+            if listing.available_lots == 0:
+                listing.status = "fully_reserved"
 
     req.status = "allocated"
     req.allocated_lots = req.requested_lots
@@ -238,7 +244,7 @@ def confirm_request(
     db.refresh(req)
 
     # Assign available vehicle
-    vehicle = db.query(Vehicle).filter(Vehicle.status == "available").first() or db.query(Vehicle).first()
+    vehicle = db.query(Vehicle).first()
     v_id = vehicle.id if vehicle else 1
     otp = f"{random.randint(100000, 999999)}"
     now = datetime.now(timezone.utc)
@@ -397,11 +403,18 @@ def ngo_accept_offer(
 
     req.status = "allocated"
     req.allocated_lots = req.requested_lots
-    db.commit()
-    db.refresh(req)
 
     listing = db.query(FoodListing).filter(FoodListing.id == req.listing_id).first()
-    vehicle = db.query(Vehicle).filter(Vehicle.status == "available").first() or db.query(Vehicle).first()
+    if listing and req.requested_lots > 0:
+        # Guarantee that lots are deducted from available inventory
+        if listing.available_lots >= req.requested_lots and listing.reserved_lots < req.requested_lots:
+            listing.available_lots -= req.requested_lots
+            listing.reserved_lots += req.requested_lots
+            if listing.available_lots == 0:
+                listing.status = "fully_reserved"
+    db.commit()
+    db.refresh(req)
+    vehicle = db.query(Vehicle).first()
     v_id = vehicle.id if vehicle else 1
     otp = f"{random.randint(100000, 999999)}"
 
@@ -493,6 +506,16 @@ def dispatch_order(
         db.commit()
 
     listing = db.query(FoodListing).filter(FoodListing.id == req.listing_id).first()
+    if listing:
+        lots = req.allocated_lots or req.requested_lots
+        if lots > 0:
+            if listing.reserved_lots >= lots:
+                listing.reserved_lots -= lots
+                listing.collected_lots += lots
+            elif listing.available_lots >= lots:
+                listing.available_lots -= lots
+                listing.collected_lots += lots
+        db.commit()
     resp = RequestResponse.model_validate(req)
     if listing:
         resp.listing_name = listing.name
@@ -536,6 +559,21 @@ def complete_delivery(
         db.commit()
 
     listing = db.query(FoodListing).filter(FoodListing.id == req.listing_id).first()
+    if listing:
+        lots = req.allocated_lots or req.requested_lots
+        if lots > 0:
+            if listing.collected_lots >= lots:
+                listing.collected_lots -= lots
+                listing.delivered_lots += lots
+            elif listing.reserved_lots >= lots:
+                listing.reserved_lots -= lots
+                listing.delivered_lots += lots
+            elif listing.available_lots >= lots:
+                listing.available_lots -= lots
+                listing.delivered_lots += lots
+        if listing.available_lots == 0 and listing.reserved_lots == 0 and listing.collected_lots == 0:
+            listing.status = "completed"
+        db.commit()
     resp = RequestResponse.model_validate(req)
     if listing:
         resp.listing_name = listing.name

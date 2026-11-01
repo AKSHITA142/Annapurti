@@ -212,9 +212,17 @@ export function NgoDashboard() {
 
     try {
       await createRequest(selectedListing.id, requestedLots)
+      // Optimistically deduct available lots right away in local state
+      setListings((prev) =>
+        prev.map((l) =>
+          l.id === selectedListing.id
+            ? { ...l, available_lots: Math.max(0, l.available_lots - requestedLots) }
+            : l
+        )
+      )
       window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       setRequestSuccess(
-        `✅ Request sent to ${selectedListing.provider_name || 'Restaurant'}! Restaurant is calculating food safety and route feasibility...`
+        `✅ Request sent for ${requestedLots} lots! Inventory updated.`
       )
       setTimeout(() => {
         setSelectedListing(null)
@@ -223,12 +231,7 @@ export function NgoDashboard() {
       }, 1500)
       await loadData()
     } catch (err: any) {
-      setRequestSuccess(`✅ Request sent to ${selectedListing.provider_name || 'Restaurant'}!`)
-      setTimeout(() => {
-        setSelectedListing(null)
-        setRequestSuccess(null)
-        setCurrentTab('orders')
-      }, 1500)
+      setRequestError(err?.message || 'Could not place request')
     } finally {
       setSubmittingRequest(false)
     }
@@ -238,6 +241,7 @@ export function NgoDashboard() {
   async function handleAcceptOffer(reqId: number) {
     try {
       await ngoAcceptOffer(reqId)
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       setNotificationMsg(
         '🎉 Order Confirmed! You agreed to the ₹50 nominal token fee. Restaurant is preparing vehicle dispatch!'
       )
@@ -251,6 +255,7 @@ export function NgoDashboard() {
       setDriverArrivedManually(false)
       await loadData()
     } catch {
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       setNotificationMsg(
         '🎉 Order Confirmed! You agreed to the ₹50 nominal token fee. Restaurant is preparing vehicle dispatch!'
       )
@@ -268,6 +273,7 @@ export function NgoDashboard() {
   async function handleConfirmDeliveryReceipt(reqId: number) {
     try {
       await completeDelivery(reqId)
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       setNotificationMsg(
         '✅ Food Received & Verified! Handover complete. Delivery state updated in both NGO and Restaurant portals.'
       )
@@ -280,6 +286,7 @@ export function NgoDashboard() {
       )
       await loadData()
     } catch {
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       setNotificationMsg(
         '✅ Food Received & Verified! Handover complete. Delivery state updated in both NGO and Restaurant portals.'
       )

@@ -59,8 +59,8 @@ export function DonorDashboard() {
     return currentTime >= deadline
   }
 
-  const activeSafeListings = listings.filter((l) => !l.is_archived && !isListingSpoiled(l) && l.status === 'active')
-  const archiveListings = listings.filter((l) => !l.is_archived && (isListingSpoiled(l) || l.status !== 'active'))
+  const activeSafeListings = listings.filter((l) => !l.is_archived && !isListingSpoiled(l) && (l.status === 'active' || l.status === 'fully_reserved'))
+  const archiveListings = listings.filter((l) => !l.is_archived && (isListingSpoiled(l) || (l.status !== 'active' && l.status !== 'fully_reserved')))
   const availableMeals = activeSafeListings.reduce((total, listing) => total + listing.available_lots * listing.lot_size, 0)
   const reservedMeals = activeSafeListings.reduce((total, listing) => total + listing.reserved_lots * listing.lot_size, 0)
   const pendingRequests = donorRequests.filter((request) => request.status === 'pending' || request.status === 'reserved').length
@@ -542,13 +542,22 @@ export function DonorDashboard() {
                   </div>
 
                   {/* Lot Inventory Breakdown */}
-                  <div className="space-y-2.5 text-xs">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Total Inventory:</span>
-                      <span className="font-bold text-slate-800">
-                        {l.total_lots} lots ({l.total_lots * l.lot_size} {l.unit})
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-slate-700">
+                      <span className="font-medium">Remaining Available:</span>
+                      <span className="font-extrabold text-emerald-700 text-sm">
+                        {l.available_lots} of {l.total_lots} lots ({l.available_lots * l.lot_size} {l.unit})
                       </span>
                     </div>
+
+                    {l.total_lots - l.available_lots > 0 && (
+                      <div className="flex justify-between items-center text-[11px] text-amber-900 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                        <span className="font-medium">Purchased / Claimed:</span>
+                        <span className="font-black">
+                          -{l.total_lots - l.available_lots} lots ({(l.total_lots - l.available_lots) * l.lot_size} {l.unit})
+                        </span>
+                      </div>
+                    )}
 
                     {/* Visual Inventory Bar */}
                     <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex ring-1 ring-inset ring-slate-200/60">

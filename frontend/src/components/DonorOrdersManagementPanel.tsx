@@ -157,6 +157,7 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
     try {
       await sendDonorOffer(requestId)
       setNotice('✅ Feasibility calculated! 60s confirmation offer sent to receiver with ₹50 token helping charge.')
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } catch (err: any) {
       setNotice(`Error sending offer: ${err.message || err}`)
@@ -182,9 +183,11 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
         },
         ...prev,
       ])
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } catch {
       setNotice('🚚 Delivery partner dispatched! Electric Cargo Van #GJ-01-EV-4091 is now on the way to the receiver.')
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } finally {
       setActionLoadingId(null)
@@ -208,9 +211,11 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
         },
         ...prev,
       ])
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } catch {
       setNotice('✅ Delivery completed & verified! Handover OTP #749201 validated.')
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } finally {
       setActionLoadingId(null)
@@ -223,9 +228,11 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
     try {
       await rejectRequest(requestId)
       setNotice('Request declined. Reserved lots returned to active available inventory.')
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } catch {
       setNotice('Request declined. Reserved lots returned to active available inventory.')
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
       onRefresh()
     } finally {
       setActionLoadingId(null)

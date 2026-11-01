@@ -172,7 +172,7 @@ def seed_test_data():
             thali.safe_deadline = deadline_thali
             if thali.status != "completed":
                 thali.status = "active"
-                if thali.available_lots == 0 and thali.reserved_lots == 0:
+                if thali.available_lots == 0 and thali.reserved_lots == 0 and thali.delivered_lots == 0:
                     thali.available_lots = 10
 
         # Listing 2: 50 Kg Sealed Rice & Dal Packets (sealed_packaged, 48h deadline)
@@ -219,7 +219,7 @@ def seed_test_data():
             rice.safe_deadline = deadline_rice
             if rice.status != "completed":
                 rice.status = "active"
-                if rice.available_lots == 0 and rice.reserved_lots == 0:
+                if rice.available_lots == 0 and rice.reserved_lots == 0 and rice.delivered_lots == 0:
                     rice.available_lots = 5
 
         db.commit()
