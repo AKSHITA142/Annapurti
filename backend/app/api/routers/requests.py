@@ -68,7 +68,9 @@ def create_request(
     resp.listing_category = listing.category
     if listing.provider:
         resp.provider_name = listing.provider.name
+        resp.provider_email = listing.provider.email
     resp.receiver_name = current_user.name
+    resp.receiver_email = current_user.email
     resp.nominal_price = 50
     return resp
 
@@ -127,8 +129,13 @@ def get_my_requests(
             resp.listing_category = r.listing.category
             if r.listing.provider:
                 resp.provider_name = r.listing.provider.name
+                resp.provider_email = r.listing.provider.email
         if not resp.provider_name:
             resp.provider_name = "Taj Skyline Hotel"
+            resp.provider_email = "taj.skyline@ahmedabad.com"
+        if r.receiver:
+            resp.receiver_name = r.receiver.name
+            resp.receiver_email = r.receiver.email
 
         # Check matched delivery job
         matched_job = next((j for j in all_jobs if r.id in (j.request_ids or [])), None)
@@ -174,13 +181,18 @@ def get_donor_requests(
         if r.listing:
             resp.listing_name = r.listing.name
             resp.listing_category = r.listing.category
+        if r.listing and r.listing.provider:
+            resp.provider_name = r.listing.provider.name
+            resp.provider_email = r.listing.provider.email
         if r.receiver:
             resp.receiver_name = r.receiver.name
+            resp.receiver_email = r.receiver.email
             prof = db.query(ReceiverProfile).filter(ReceiverProfile.user_id == r.receiver_id).first()
             if prof:
                 resp.receiver_priority_class = prof.priority_class
         else:
             resp.receiver_name = f"NGO Beneficiary #{r.receiver_id}"
+            resp.receiver_email = "apang.mandal@ahmedabad.org"
 
         # Check delivery partner status
         resp.delivery_basis = "delivery_partner"

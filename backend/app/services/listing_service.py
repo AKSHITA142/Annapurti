@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.listing import FoodListing
+from app.models.log import InventoryLog
 from app.services.safety_rules import safety_service
 
 
@@ -31,6 +32,7 @@ class ListingService:
         Creates a new FoodListing.
         Computes safe_deadline deterministically from the category safety rules table,
         enforcing the hard constraint that sender can only shorten, never extend the safe window.
+        Strictly initializes status='active', is_archived=False, available_lots=total_lots.
         """
         if prepared_at.tzinfo is None:
             prepared_at = prepared_at.replace(tzinfo=timezone.utc)
@@ -69,6 +71,7 @@ class ListingService:
             delivery_contribution_type=delivery_contribution_type,
             contribution_amount=contribution_amount,
             status="active",
+            is_archived=False,
         )
 
         assert listing.check_invariant(), "New listing failed quantity invariant check"
@@ -76,5 +79,17 @@ class ListingService:
         db.add(listing)
         db.commit()
         db.refresh(listing)
-        return listing
 
+        # Audit trail tracking
+        InventoryLog.log(
+            db=db,
+            listing_id=listing.id,
+            action="created",
+            new_status="active",
+            available_lots=listing.available_lots,
+            reserved_lots=0,
+            note=f"Created listing '{listing.name}' ({listing.total_lots} lots, {listing.lot_size} {listing.unit}/lot)",
+        )
+        db.commit()
+
+        return listing

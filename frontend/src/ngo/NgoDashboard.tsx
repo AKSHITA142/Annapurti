@@ -102,15 +102,21 @@ export function NgoDashboard() {
     return () => clearInterval(clock)
   }, [])
 
+  function parseIsoDate(isoStr?: string): number {
+    if (!isoStr) return 0
+    const normalized = isoStr.endsWith('Z') || isoStr.includes('+') ? isoStr : `${isoStr}Z`
+    return new Date(normalized).getTime()
+  }
+
   function isListingSpoiled(l: FoodListing): boolean {
     if (l.status === 'expired') return true
     if (l.spoilage_minutes_remaining !== undefined && l.spoilage_minutes_remaining <= 0) return true
-    const deadline = new Date(l.safe_deadline).getTime()
+    const deadline = parseIsoDate(l.safe_deadline)
     return currentTime >= deadline
   }
 
   const safeAvailableListings = listings.filter(
-    (l) => !isListingSpoiled(l) && l.available_lots > 0 && l.status === 'active'
+    (l) => !l.is_archived && !isListingSpoiled(l) && l.available_lots > 0 && l.status === 'active'
   )
 
   async function loadData() {
@@ -557,10 +563,10 @@ export function NgoDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {safeAvailableListings.map((l) => {
               const prepTime = l.prepared_at
-                ? new Date(l.prepared_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                ? new Date(parseIsoDate(l.prepared_at)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 : 'Recent'
               const deadlineClock = l.safe_deadline
-                ? new Date(l.safe_deadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                ? new Date(parseIsoDate(l.safe_deadline)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 : ''
               const pctRemaining = Math.max(0, Math.min(100, (l.available_lots / (l.total_lots || 1)) * 100))
 
@@ -570,20 +576,46 @@ export function NgoDashboard() {
                   className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
                 >
                   <div>
-                    {/* Restaurant & Feasibility Header */}
+                    {/* Restaurant & Feasibility Header with Quick Donor Switcher */}
                     <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
                       <div className="flex items-center space-x-2">
                         <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
                           <Building2 className="w-4 h-4" />
                         </div>
-                        <span className="font-extrabold text-xs text-slate-900">
-                          {l.provider_name || 'Taj Skyline Hotel'}
-                        </span>
+                        <div>
+                          <span className="font-extrabold text-xs text-slate-900 block leading-tight">
+                            {l.provider_name || 'Taj Skyline Hotel'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono block">
+                            {l.provider_email || 'taj.skyline@ahmedabad.com'}
+                          </span>
+                        </div>
                       </div>
-                      <FeasibilityBadge
-                        badge={l.feasibility_badge}
-                        slackMinutes={l.journey_slack_minutes}
-                      />
+                      <div className="flex items-center space-x-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.dispatchEvent(
+                              new CustomEvent('foodrescue:switch_persona', {
+                                detail: {
+                                  email: l.provider_email || 'taj.skyline@ahmedabad.com',
+                                  role: 'provider',
+                                  targetTab: 'donor',
+                                },
+                              })
+                            )
+                          }}
+                          className="px-2 py-0.8 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Switch to this donor's account to fulfill and dispatch this listing"
+                        >
+                          <RefreshCw className="w-2.5 h-2.5 text-emerald-600" />
+                          <span>Switch to Donor</span>
+                        </button>
+                        <FeasibilityBadge
+                          badge={l.feasibility_badge}
+                          slackMinutes={l.journey_slack_minutes}
+                        />
+                      </div>
                     </div>
 
                     {/* Food Name & Veg/Non-Veg & Category Badges */}

@@ -13,6 +13,7 @@ import {
   clearSession,
   fetchHealth,
   getCurrentUser,
+  login,
   User,
 } from './api/client'
 import { DonorDashboard } from './donor/DonorDashboard'
@@ -42,7 +43,34 @@ export function App() {
     fetchHealth()
       .then(() => setApiOnline(true))
       .catch(() => setApiOnline(false))
+
+    // Listener for cross-component one-click persona switching (e.g. from NGO card to Donor)
+    const handleSwitch = async (e: Event) => {
+      const customEvent = e as CustomEvent<{ email: string; role?: string; targetTab?: ActiveTab }>
+      if (!customEvent.detail?.email) return
+      const { email, role, targetTab } = customEvent.detail
+      try {
+        const res = await login(email, undefined, role || 'provider')
+        handleLoginSuccess(res.user, targetTab)
+        window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
+      } catch (err) {
+        console.error('Failed to switch persona:', err)
+      }
+    }
+
+    window.addEventListener('foodrescue:switch_persona', handleSwitch)
+    return () => window.removeEventListener('foodrescue:switch_persona', handleSwitch)
   }, [])
+
+  async function quickSwitch(email: string, role: string, tab: ActiveTab) {
+    try {
+      const res = await login(email, undefined, role)
+      handleLoginSuccess(res.user, tab)
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
+    } catch (err) {
+      console.error('Quick switch failed:', err)
+    }
+  }
 
   function handleLoginSuccess(authenticatedUser: User, targetTab?: ActiveTab) {
     setUser(authenticatedUser)
@@ -201,6 +229,62 @@ export function App() {
                 </button>
               </div>
             )}
+
+            {/* Persistent Global Test Switcher Bar */}
+            <div className="hidden xl:flex items-center gap-1.5 p-1 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs">
+              <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1 pl-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Test:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => quickSwitch('taj.skyline@ahmedabad.com', 'provider', 'donor')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                  user.email === 'taj.skyline@ahmedabad.com'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+                title="Switch to Taj Skyline Hotel (Donor)"
+              >
+                🍲 Donor (Taj)
+              </button>
+              <button
+                type="button"
+                onClick={() => quickSwitch('apang.mandal@ahmedabad.org', 'ngo', 'ngo')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                  user.email === 'apang.mandal@ahmedabad.org'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+                title="Switch to Apang Manav Mandal (NGO)"
+              >
+                🤝 NGO (Apang)
+              </button>
+              <button
+                type="button"
+                onClick={() => quickSwitch('community.relief@ahmedabad.org', 'both', 'donor')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                  user.email === 'community.relief@ahmedabad.org'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+                title="Switch to Dual Role (Both Donor + NGO in 1 account)"
+              >
+                🌟 Both
+              </button>
+              <button
+                type="button"
+                onClick={() => quickSwitch('admin@amc.gov.in', 'admin', 'admin')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                  user.email === 'admin@amc.gov.in'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+                title="Switch to City Admin"
+              >
+                🛡️ Admin
+              </button>
+            </div>
 
             {/* Authenticated User Profile Button (Opens Profile Settings Modal) */}
             <button

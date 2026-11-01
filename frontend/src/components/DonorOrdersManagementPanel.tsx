@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import {
   CheckCircle2,
+  RefreshCw,
   Clock,
   Truck,
   Building2,
   ShieldCheck,
   XCircle,
-  MapPin,
   Send,
   MessageSquare,
 } from 'lucide-react'
@@ -262,12 +262,32 @@ export const DonorOrdersManagementPanel: React.FC<DonorOrdersManagementPanelProp
                     <Building2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-900 text-sm">
-                      {req.receiver_name || `NGO Beneficiary #${req.receiver_id}`}
-                    </h4>
-                    <div className="flex items-center space-x-1.5 text-[11px] text-slate-500">
-                      <MapPin className="w-3 h-3 text-emerald-600" />
-                      <span>Ahmedabad Central Hub</span>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        {req.receiver_name || `NGO Beneficiary #${req.receiver_id}`}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent('foodrescue:switch_persona', {
+                              detail: {
+                                email: req.receiver_email || 'apang.mandal@ahmedabad.org',
+                                role: 'ngo',
+                                targetTab: 'ngo',
+                              },
+                            })
+                          )
+                        }}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors flex items-center gap-0.5 cursor-pointer"
+                        title="Switch to this NGO to accept the 60s offer & verify delivery OTP"
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" />
+                        <span>Switch to NGO</span>
+                      </button>
+                    </div>
+                    <div className="flex items-center space-x-1.5 text-[10px] text-slate-400 font-mono">
+                      <span>{req.receiver_email || 'apang.mandal@ahmedabad.org'}</span>
                     </div>
                   </div>
                 </div>

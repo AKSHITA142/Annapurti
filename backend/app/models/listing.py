@@ -34,6 +34,7 @@ class FoodListing(Base):
     delivery_contribution_type = Column(String(50), default="free", nullable=False)  # free, fixed, negotiable
     contribution_amount = Column(Float, default=0.0, nullable=False)
     status = Column(String(50), default="active", nullable=False)  # active, fully_reserved, completed, expired, cancelled
+    is_archived = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships

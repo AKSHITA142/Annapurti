@@ -46,6 +46,14 @@ interface DemoAccount {
 const DEMO_ACCOUNTS: Record<AuthRole, Array<DemoAccount>> = {
   provider: [
     {
+      name: 'Annapurna Restaurant & Caterers',
+      email: 'donor.test@foodrescue.ai',
+      phone: '9876543210',
+      address: 'CG Road, Navrangpura, Ahmedabad, Gujarat 380009',
+      lat: 23.0300,
+      lng: 72.5580,
+    },
+    {
       name: 'Taj Skyline Hotel (Banquets & Dining)',
       email: 'taj.skyline@ahmedabad.com',
       phone: '9825011223',
@@ -53,31 +61,15 @@ const DEMO_ACCOUNTS: Record<AuthRole, Array<DemoAccount>> = {
       lat: 23.0035,
       lng: 72.5015,
     },
-    {
-      name: 'Grand Taj Caterers & Banquets',
-      email: 'taj.caterers@ahmedabad.com',
-      phone: '9825133445',
-      address: 'C.G. Road, Navrangpura, Ahmedabad, Gujarat 380009',
-      lat: 23.0225,
-      lng: 72.5714,
-    },
-    {
-      name: 'Iscon Thal Banquets',
-      email: 'iscon.thal@ahmedabad.com',
-      phone: '9825255667',
-      address: 'SG Highway, Near Iscon Cross Road, Satellite, Ahmedabad, Gujarat 380015',
-      lat: 23.0305,
-      lng: 72.518,
-    },
   ],
   ngo: [
     {
       name: 'Apang Manav Mandal Shelter',
-      email: 'apang.mandal@ahmedabad.org',
-      phone: '9879077889',
-      address: 'Dr. Vikram Sarabhai Marg, University Area, Ahmedabad, Gujarat 380015',
-      lat: 23.0425,
-      lng: 72.541,
+      email: 'ngo.test@foodrescue.ai',
+      phone: '9876543211',
+      address: 'Drive In Road, Ahmedabad, Gujarat 380052',
+      lat: 23.0450,
+      lng: 72.5270,
     },
     {
       name: 'Blind People’s Association',
@@ -87,16 +79,16 @@ const DEMO_ACCOUNTS: Record<AuthRole, Array<DemoAccount>> = {
       lat: 23.011,
       lng: 72.535,
     },
-    {
-      name: 'Shishu Gruh Child Orphanage',
-      email: 'shishu.gruh@ahmedabad.org',
-      phone: '9879299001',
-      address: 'Paldi Cross Roads, Ellisbridge, Ahmedabad, Gujarat 380006',
-      lat: 23.055,
-      lng: 72.585,
-    },
   ],
   both: [
+    {
+      name: 'Community Food Hub',
+      email: 'both.test@foodrescue.ai',
+      phone: '9876543212',
+      address: 'Maninagar, Ahmedabad, Gujarat 380008',
+      lat: 22.9940,
+      lng: 72.6030,
+    },
     {
       name: 'Community Kitchen & Relief Shelter',
       email: 'community.relief@ahmedabad.org',
@@ -467,6 +459,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   }
 
+  async function handleDirectInstantLogin(acc: DemoAccount, targetRole: AuthRole) {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await login(
+        acc.email,
+        acc.name,
+        targetRole,
+        acc.lat,
+        acc.lng,
+        acc.phone,
+        acc.name,
+        acc.address
+      )
+      handlePostVerificationRouting(res.user)
+    } catch {
+      const fallbackUser: User = {
+        id: targetRole === 'admin' ? 99 : targetRole === 'provider' ? 1 : targetRole === 'both' ? 12 : 6,
+        name: acc.name,
+        email: acc.email,
+        phone: acc.phone,
+        organization: acc.name,
+        address: acc.address,
+        role: targetRole as any,
+        verified: true,
+        city: 'Ahmedabad',
+        lat: acc.lat,
+        lng: acc.lng,
+        created_at: new Date().toISOString(),
+      }
+      handlePostVerificationRouting(fallbackUser)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   function handlePostVerificationRouting(authenticatedUser: User) {
     if (role === 'both' || authenticatedUser.role === 'both') {
       // 4. "Both" Account: Presents clean prompt/workspace selector to choose Donor vs NGO
@@ -752,28 +780,87 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   )}
                 </div>
 
-                {/* Quick-fill sample accounts (Clickable chips, NOT a dropdown) */}
-                <div className="pt-1">
-                  <span className="block text-[10px] font-semibold text-[#6b8577] mb-1">
-                    Quick-fill registered sample:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DEMO_ACCOUNTS[role].map((acc) => (
-                      <button
-                        key={acc.email}
-                        type="button"
-                        onClick={() => {
-                          setLoginIdentifier(acc.email)
-                          setError('')
-                          setFieldErrors({})
-                        }}
-                        className="px-2 py-1 rounded-lg bg-[#f0f5e5] hover:bg-[#e4eed3] border border-[#d6e4c4] text-[10px] font-semibold text-[#1e4a34] transition-all cursor-pointer flex items-center gap-1"
-                        title={`Click to fill ${acc.email} (${acc.address})`}
-                      >
-                        <span>{acc.name.split(' ')[0]}</span>
-                        <span className="text-[#648476]">({acc.email})</span>
-                      </button>
-                    ))}
+                {/* One-Click Quick-Fill Sample Accounts for Fast Flow Testing */}
+                <div className="pt-2 p-3 bg-gradient-to-br from-[#f4f8eb] to-[#e8f2d8] rounded-2xl border border-[#d3e3be] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold text-[#1e4a34] flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-[#3b872b]" />
+                      <span>One-Click Testing Accounts:</span>
+                    </span>
+                    <span className="text-[10px] text-[#4d705c] font-medium">Bypass OTP typing</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleDirectInstantLogin(DEMO_ACCOUNTS.provider[0], 'provider')}
+                      className="p-2 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-200 text-left transition-all cursor-pointer shadow-2xs group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-emerald-900 group-hover:text-emerald-700">
+                          🍲 Annapurna Restaurant
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                          Donor
+                        </span>
+                      </div>
+                      <span className="block text-[10px] text-slate-500 font-mono truncate">
+                        donor.test@foodrescue.ai
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDirectInstantLogin(DEMO_ACCOUNTS.ngo[0], 'ngo')}
+                      className="p-2 rounded-xl bg-white hover:bg-purple-50 border border-purple-200 text-left transition-all cursor-pointer shadow-2xs group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-purple-900 group-hover:text-purple-700">
+                          🤝 Apang Manav Shelter
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 text-purple-800">
+                          NGO
+                        </span>
+                      </div>
+                      <span className="block text-[10px] text-slate-500 font-mono truncate">
+                        ngo.test@foodrescue.ai
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDirectInstantLogin(DEMO_ACCOUNTS.both[0], 'both')}
+                      className="p-2 rounded-xl bg-white hover:bg-amber-50 border border-amber-200 text-left transition-all cursor-pointer shadow-2xs group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-amber-900 group-hover:text-amber-700">
+                          🌟 Community Food Hub
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                          Both Roles
+                        </span>
+                      </div>
+                      <span className="block text-[10px] text-slate-500 font-mono truncate">
+                        both.test@foodrescue.ai
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDirectInstantLogin(DEMO_ACCOUNTS.admin[0], 'admin')}
+                      className="p-2 rounded-xl bg-white hover:bg-blue-50 border border-blue-200 text-left transition-all cursor-pointer shadow-2xs group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-blue-900 group-hover:text-blue-700">
+                          🛡️ City AMC Admin
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-100 text-blue-800">
+                          Admin
+                        </span>
+                      </div>
+                      <span className="block text-[10px] text-slate-500 font-mono truncate">
+                        admin@amc.gov.in
+                      </span>
+                    </button>
                   </div>
                 </div>
               </div>

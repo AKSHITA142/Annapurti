@@ -32,6 +32,8 @@ class RequestResponse(BaseModel):
     delivery_job_status: Optional[str] = None
     otp_code: Optional[str] = None
     provider_name: Optional[str] = None
+    provider_email: Optional[str] = None
+    receiver_email: Optional[str] = None
     nominal_price: Optional[int] = 50
     offer_seconds_remaining: Optional[int] = 60
 

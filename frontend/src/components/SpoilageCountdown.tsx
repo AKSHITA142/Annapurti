@@ -17,7 +17,9 @@ export function SpoilageCountdown({ safeDeadline, compact = false }: SpoilageCou
 
   useEffect(() => {
     function calculate() {
-      const target = new Date(safeDeadline).getTime()
+      if (!safeDeadline) return
+      const normalizedDeadline = safeDeadline.endsWith('Z') || safeDeadline.includes('+') ? safeDeadline : `${safeDeadline}Z`
+      const target = new Date(normalizedDeadline).getTime()
       const now = Date.now()
       const diff = Math.floor((target - now) / 1000)
 
