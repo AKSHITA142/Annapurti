@@ -245,7 +245,19 @@ export function App() {
                 }`}
                 title="Switch to Taj Skyline Hotel (Donor)"
               >
-                🍲 Donor (Taj)
+                🏨 Hotel (Taj)
+              </button>
+              <button
+                type="button"
+                onClick={() => quickSwitch('cafeteria.donor@foodrescue.ai', 'provider', 'donor')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                  user.email === 'cafeteria.donor@foodrescue.ai'
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                }`}
+                title="Switch to Gujarat University Campus Cafeteria (Donor)"
+              >
+                ☕ Cafeteria
               </button>
               <button
                 type="button"

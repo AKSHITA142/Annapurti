@@ -5,6 +5,7 @@ import {
   CheckCircle,
   CheckCircle2,
   Clock,
+  Coffee,
   KeyRound,
   Package,
   QrCode,
@@ -597,6 +598,10 @@ export function NgoDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {safeAvailableListings.map((l) => {
               const totalMeals = l.available_lots * l.lot_size
+              const isCafe = (l.provider_name || '').toLowerCase().includes('cafeteria') ||
+                             (l.provider_name || '').toLowerCase().includes('canteen') ||
+                             (l.name || '').toLowerCase().includes('cafeteria') ||
+                             (l.name || '').toLowerCase().includes('canteen')
 
               return (
                 <div
@@ -613,15 +618,24 @@ export function NgoDashboard() {
                     {/* Header: Provider & Compact Feasibility Badge */}
                     <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                       <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                        <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold shrink-0">
-                          <Building2 className="w-4 h-4" />
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                          isCafe ? 'bg-teal-50 text-teal-700' : 'bg-purple-50 text-purple-700'
+                        }`}>
+                          {isCafe ? <Coffee className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
                         </div>
                         <div className="min-w-0">
-                          <span className="font-extrabold text-xs text-slate-900 block truncate leading-tight">
-                            {l.provider_name || 'Taj Skyline Hotel'}
-                          </span>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-extrabold text-xs text-slate-900 block truncate leading-tight">
+                              {l.provider_name || (isCafe ? 'University Cafeteria' : 'Taj Skyline Hotel')}
+                            </span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
+                              isCafe ? 'bg-teal-100 text-teal-800 border border-teal-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}>
+                              {isCafe ? '☕ Cafeteria' : '🏨 Hotel'}
+                            </span>
+                          </div>
                           <span className="text-[10px] text-slate-400 font-mono block truncate">
-                            {l.provider_email || 'taj.skyline@ahmedabad.com'}
+                            {l.provider_email || (isCafe ? 'cafeteria.donor@foodrescue.ai' : 'taj.skyline@ahmedabad.com')}
                           </span>
                         </div>
                       </div>

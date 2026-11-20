@@ -47,6 +47,29 @@ def seed_test_data():
             donor.lng = 72.5580
             db.commit()
 
+        # 1b. Test Cafeteria Donor Account
+        cafeteria_donor = db.query(User).filter(User.email == "cafeteria.donor@foodrescue.ai").first()
+        if not cafeteria_donor:
+            cafeteria_donor = User(
+                name="Gujarat University Campus Cafeteria",
+                email="cafeteria.donor@foodrescue.ai",
+                role="provider",
+                city="Ahmedabad",
+                address="Gujarat University, Navrangpura, Ahmedabad, Gujarat 380009",
+                lat=23.0384,
+                lng=72.5458,
+                verified=True,
+            )
+            db.add(cafeteria_donor)
+            db.commit()
+            db.refresh(cafeteria_donor)
+        else:
+            cafeteria_donor.name = "Gujarat University Campus Cafeteria"
+            cafeteria_donor.address = "Gujarat University, Navrangpura, Ahmedabad, Gujarat 380009"
+            cafeteria_donor.lat = 23.0384
+            cafeteria_donor.lng = 72.5458
+            db.commit()
+
         # 2. Test NGO Account
         ngo = db.query(User).filter(User.email == "ngo.test@foodrescue.ai").first()
         if not ngo:
@@ -221,6 +244,54 @@ def seed_test_data():
                 rice.status = "active"
                 if rice.available_lots == 0 and rice.reserved_lots == 0 and rice.delivered_lots == 0:
                     rice.available_lots = 5
+
+        # Listing 3: University Cafeteria Lunch Trays (cooked_hot, 4h deadline)
+        cafe_deleted = any("University Cafeteria Lunch Combos" in n for n in deleted_notes)
+        cafe_listing = None
+        if not cafe_deleted and cafeteria_donor:
+            cafe_listing = (
+                db.query(FoodListing)
+                .filter(
+                    FoodListing.provider_id == cafeteria_donor.id,
+                    FoodListing.name == "University Cafeteria Lunch Combos (Rice, Dal, Subzi, Roti)",
+                )
+                .first()
+            )
+            deadline_cafe = now + timedelta(hours=4)
+            if not cafe_listing:
+                cafe_listing = FoodListing(
+                    provider_id=cafeteria_donor.id,
+                    name="University Cafeteria Lunch Combos (Rice, Dal, Subzi, Roti)",
+                    category="cooked_hot",
+                    veg=True,
+                    unit="meals",
+                    lot_size=10,
+                    total_lots=6,
+                    available_lots=6,
+                    reserved_lots=0,
+                    collected_lots=0,
+                    delivered_lots=0,
+                    closed_lots=0,
+                    prepared_at=now,
+                    safe_deadline=deadline_cafe,
+                    storage_requirement="ambient",
+                    pickup_lat=23.0384,
+                    pickup_lng=72.5458,
+                    pickup_window_start=now,
+                    pickup_window_end=now + timedelta(hours=2),
+                    delivery_mode_offered="sender_vehicle",
+                    delivery_contribution_type="nominal_token",
+                    contribution_amount=50.0,
+                    status="active",
+                )
+                db.add(cafe_listing)
+            else:
+                cafe_listing.prepared_at = now
+                cafe_listing.safe_deadline = deadline_cafe
+                if cafe_listing.status != "completed":
+                    cafe_listing.status = "active"
+                    if cafe_listing.available_lots == 0 and cafe_listing.reserved_lots == 0 and cafe_listing.delivered_lots == 0:
+                        cafe_listing.available_lots = 6
 
         db.commit()
     except Exception as e:
