@@ -164,11 +164,11 @@ export function DonorDashboard() {
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
   const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
-  // 1-second live clock for instant food safety spoilage removal
+  // Live clock for food safety spoilage checks (every 15 seconds to prevent 1-second UI flicker)
   useEffect(() => {
     const clock = setInterval(() => {
       setCurrentTime(Date.now())
-    }, 1000)
+    }, 15000)
     return () => clearInterval(clock)
   }, [])
 
@@ -212,8 +212,8 @@ export function DonorDashboard() {
     delivery_mode_offered: 'sender_vehicle',
   })
 
-  async function loadData() {
-    setLoading(true)
+  async function loadData(silent: boolean = false) {
+    if (!silent) setLoading(true)
     try {
       const [data, reqData] = await Promise.all([
         getListings(),
@@ -224,23 +224,23 @@ export function DonorDashboard() {
     } catch (err: any) {
       console.error('Failed to load listings', err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
+    loadData(false)
 
-    // Real-time synchronization listener across tabs/components
+    // Real-time synchronization listener across tabs/components (silent background sync)
     const handleSync = () => {
-      loadData()
+      loadData(true)
     }
     window.addEventListener('foodrescue:sync_listings', handleSync)
 
-    // Polling interval for live sync across active devices (every 3 seconds)
+    // Silent background polling every 5 seconds (never flickers empty state)
     const interval = setInterval(() => {
-      loadData()
-    }, 3000)
+      loadData(true)
+    }, 5000)
 
     return () => {
       window.removeEventListener('foodrescue:sync_listings', handleSync)
@@ -764,7 +764,7 @@ export function DonorDashboard() {
               </div>
 
               <button
-                onClick={loadData}
+                onClick={() => loadData(false)}
                 className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center space-x-1 p-2 rounded-lg hover:bg-slate-100 cursor-pointer"
                 title="Refresh inventory"
               >

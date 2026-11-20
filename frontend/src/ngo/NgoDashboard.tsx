@@ -94,21 +94,13 @@ export function NgoDashboard() {
   const [viewHistoryDetailsReq, setViewHistoryDetailsReq] = useState<DonationRequest | null>(null)
   const HISTORY_PER_PAGE = 3
 
-  // Countdown timer for 60-second offer window
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setOfferCountdown((prev) => (prev > 1 ? prev - 1 : 60))
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
-
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
 
-  // 1-second live clock for instant food safety spoilage removal
+  // Live clock for food safety spoilage checks (evaluates every 15 seconds, avoiding 1-second UI flicker)
   useEffect(() => {
     const clock = setInterval(() => {
       setCurrentTime(Date.now())
-    }, 1000)
+    }, 15000)
     return () => clearInterval(clock)
   }, [])
 
@@ -129,8 +121,8 @@ export function NgoDashboard() {
     (l) => !l.is_archived && !isListingSpoiled(l) && l.available_lots > 0 && l.status === 'active'
   )
 
-  async function loadData() {
-    setLoading(true)
+  async function loadData(silent: boolean = false) {
+    if (!silent) setLoading(true)
     try {
       const [listData, reqData, jobsData] = await Promise.all([
         getListings(categoryFilter || undefined),
@@ -143,23 +135,23 @@ export function NgoDashboard() {
     } catch (err: any) {
       console.error('Failed to load NGO dashboard data', err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
+    loadData(false)
 
-    // Real-time synchronization listener across tabs/components
+    // Real-time synchronization listener across tabs/components (silent background sync)
     const handleSync = () => {
-      loadData()
+      loadData(true)
     }
     window.addEventListener('foodrescue:sync_listings', handleSync)
 
-    // Live inventory polling (every 3 seconds)
+    // Silent background polling every 5 seconds (never flickers empty state)
     const interval = setInterval(() => {
-      loadData()
-    }, 3000)
+      loadData(true)
+    }, 5000)
 
     return () => {
       window.removeEventListener('foodrescue:sync_listings', handleSync)
@@ -486,7 +478,7 @@ export function NgoDashboard() {
           )}
 
           <button
-            onClick={loadData}
+            onClick={() => loadData(false)}
             className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors shadow-2xs cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />

@@ -14,6 +14,16 @@ app = FastAPI(
     description="Intelligent surplus food redistribution engine with food safety deadlines and routing optimization",
 )
 
+# CORS configuration - registered FIRST so all preflight and cross-origin requests are handled
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"^https?://.*",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 def seed_test_data():
     """Seeds test accounts and active test listings for end-to-end flow testing."""
     from datetime import datetime, timedelta, timezone
@@ -341,16 +351,6 @@ async def startup_db():
 
     import asyncio
     asyncio.create_task(periodic_expiry_sweeper())
-
-# CORS configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r"^https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Register API Routers
 app.include_router(auth.router)
