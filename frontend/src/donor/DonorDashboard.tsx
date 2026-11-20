@@ -29,6 +29,7 @@ import {
 } from '../api/client'
 import { SpoilageCountdown } from '../components/SpoilageCountdown'
 import { DonorOrdersManagementPanel } from '../components/DonorOrdersManagementPanel'
+import { API_BASE_URL } from '../config'
 
 interface FoodTemplate {
   name: string
@@ -254,7 +255,6 @@ export function DonorDashboard() {
 
     try {
       const token = localStorage.getItem('foodrescue_token')
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
       const res = await fetch(`${API_BASE_URL}/listings/parse-intake`, {
         method: 'POST',
         headers: {

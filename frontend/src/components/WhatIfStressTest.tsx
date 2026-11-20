@@ -11,8 +11,7 @@ import {
 } from 'recharts'
 import { Play, Sliders, Sparkles } from 'lucide-react'
 import { SimulatedBadge } from './SimulatedBadge'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import { API_BASE_URL } from '../config'
 
 interface WhatIfResult {
   method: string
