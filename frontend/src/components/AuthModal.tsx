@@ -54,6 +54,14 @@ const DEMO_ACCOUNTS: Record<AuthRole, Array<DemoAccount>> = {
       lng: 72.5580,
     },
     {
+      name: 'Gujarat University Campus Cafeteria',
+      email: 'cafeteria.donor@foodrescue.ai',
+      phone: '9825123456',
+      address: 'Gujarat University, Navrangpura, Ahmedabad, Gujarat 380009',
+      lat: 23.0384,
+      lng: 72.5458,
+    },
+    {
       name: 'Taj Skyline Hotel (Banquets & Dining)',
       email: 'taj.skyline@ahmedabad.com',
       phone: '9825011223',
@@ -797,7 +805,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-black text-emerald-900 group-hover:text-emerald-700">
-                          🍲 Annapurna Restaurant
+                          🏨 Hotel / Restaurant
                         </span>
                         <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
                           Donor
@@ -805,6 +813,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </div>
                       <span className="block text-[10px] text-slate-500 font-mono truncate">
                         donor.test@foodrescue.ai
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDirectInstantLogin(DEMO_ACCOUNTS.provider[1], 'provider')}
+                      className="p-2 rounded-xl bg-white hover:bg-teal-50 border border-teal-200 text-left transition-all cursor-pointer shadow-2xs group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-teal-900 group-hover:text-teal-700">
+                          ☕ University Cafeteria
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-teal-100 text-teal-800">
+                          Donor
+                        </span>
+                      </div>
+                      <span className="block text-[10px] text-slate-500 font-mono truncate">
+                        cafeteria.donor@foodrescue.ai
                       </span>
                     </button>
 

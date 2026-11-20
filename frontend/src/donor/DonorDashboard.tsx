@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import {
   ArrowUpRight,
+  Building2,
   Clock,
   CheckCircle2,
   ClipboardCheck,
+  Coffee,
   Layers,
   Plus,
   RefreshCw,
   Send,
+  Sparkles,
   Trash2,
   Truck,
   Utensils,
+  Zap,
 } from 'lucide-react'
 import {
   FoodListing,
@@ -26,6 +30,125 @@ import {
 import { SpoilageCountdown } from '../components/SpoilageCountdown'
 import { DonorOrdersManagementPanel } from '../components/DonorOrdersManagementPanel'
 
+interface FoodTemplate {
+  name: string
+  category: string
+  veg: boolean
+  lot_size: number
+  total_lots: number
+  sender_declared_window_minutes: number
+  storage_requirement: string
+  delivery_mode_offered: string
+  establishmentType: 'cafeteria' | 'hotel'
+  desc: string
+  timeWindow: string
+  icon: string
+}
+
+const CAFETERIA_PRESETS: FoodTemplate[] = [
+  {
+    name: 'University Cafeteria Lunch Combos (Rice, Dal, Subzi, Roti)',
+    category: 'cooked_hot',
+    veg: true,
+    lot_size: 10,
+    total_lots: 5,
+    sender_declared_window_minutes: 240,
+    storage_requirement: 'ambient',
+    delivery_mode_offered: 'sender_vehicle',
+    establishmentType: 'cafeteria',
+    desc: '50 fresh hot lunch plates from university campus dining hall',
+    timeWindow: '4h Safe Window',
+    icon: '🍱',
+  },
+  {
+    name: 'Canteen Snack & Sandwich Packs',
+    category: 'cooked_chilled',
+    veg: true,
+    lot_size: 10,
+    total_lots: 4,
+    sender_declared_window_minutes: 480,
+    storage_requirement: 'cold_chain',
+    delivery_mode_offered: 'sender_vehicle',
+    establishmentType: 'cafeteria',
+    desc: '40 wrapped sandwiches & samosa packets from campus pantry',
+    timeWindow: '8h Cold Chain',
+    icon: '🥪',
+  },
+  {
+    name: 'Fresh Salad & Fruit Protein Bowls',
+    category: 'raw_refrigerated',
+    veg: true,
+    lot_size: 5,
+    total_lots: 4,
+    sender_declared_window_minutes: 720,
+    storage_requirement: 'cold_chain',
+    delivery_mode_offered: 'all',
+    establishmentType: 'cafeteria',
+    desc: '20 fresh fruit & sprout bowls kept in chilled counter',
+    timeWindow: '12h Cold Chain',
+    icon: '🥗',
+  },
+  {
+    name: 'Evening Canteen Khichdi & Kadhi Packets',
+    category: 'cooked_hot',
+    veg: true,
+    lot_size: 10,
+    total_lots: 4,
+    sender_declared_window_minutes: 240,
+    storage_requirement: 'ambient',
+    delivery_mode_offered: 'sender_vehicle',
+    establishmentType: 'cafeteria',
+    desc: '40 hot nutrient-dense khichdi meal trays',
+    timeWindow: '4h Safe Window',
+    icon: '🍲',
+  },
+]
+
+const HOTEL_PRESETS: FoodTemplate[] = [
+  {
+    name: 'Grand Banquet Veg Thali (Paneer & Dal Makhani)',
+    category: 'cooked_hot',
+    veg: true,
+    lot_size: 10,
+    total_lots: 6,
+    sender_declared_window_minutes: 240,
+    storage_requirement: 'ambient',
+    delivery_mode_offered: 'sender_vehicle',
+    establishmentType: 'hotel',
+    desc: '60 luxury banquet dinner portions with naan & sweets',
+    timeWindow: '4h Safe Window',
+    icon: '🥘',
+  },
+  {
+    name: 'Hyderabadi Dum Biryani Handi',
+    category: 'cooked_hot',
+    veg: false,
+    lot_size: 10,
+    total_lots: 4,
+    sender_declared_window_minutes: 240,
+    storage_requirement: 'ambient',
+    delivery_mode_offered: 'sender_vehicle',
+    establishmentType: 'hotel',
+    desc: '40 portions of slow-cooked dum biryani with raita',
+    timeWindow: '4h Safe Window',
+    icon: '🍚',
+  },
+  {
+    name: 'Hotel Breakfast Buffet (Idli, Vada, Sambhar)',
+    category: 'cooked_hot',
+    veg: true,
+    lot_size: 10,
+    total_lots: 4,
+    sender_declared_window_minutes: 240,
+    storage_requirement: 'ambient',
+    delivery_mode_offered: 'sender_vehicle',
+    establishmentType: 'hotel',
+    desc: '40 hot breakfast combo trays from morning service',
+    timeWindow: '4h Safe Window',
+    icon: '🥞',
+  },
+]
+
 export function DonorDashboard() {
   const [listings, setListings] = useState<FoodListing[]>([])
   const [donorRequests, setDonorRequests] = useState<DonationRequest[]>([])
@@ -35,6 +158,8 @@ export function DonorDashboard() {
   const [allocationStatus, setAllocationStatus] = useState<string | null>(null)
   const [listingFilter, setListingFilter] = useState<'active' | 'archive'>('active')
   const [workspaceTab, setWorkspaceTab] = useState<'inventory' | 'orders'>('inventory')
+  const [generatorTab, setGeneratorTab] = useState<'cafeteria' | 'hotel'>('cafeteria')
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(true)
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
   const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
@@ -308,6 +433,61 @@ export function DonorDashboard() {
     setShowCreateModal(true)
   }
 
+  async function handleQuickGenerate(template: FoodTemplate) {
+    setSubmitting(true)
+    try {
+      const now = new Date()
+      const pickupStart = new Date(now.getTime() + 10 * 60000)
+      const pickupEnd = new Date(now.getTime() + 120 * 60000)
+      const activeUser = getCurrentUser()
+
+      await createListing({
+        name: template.name,
+        category: template.category,
+        veg: template.veg,
+        lot_size: template.lot_size,
+        total_lots: template.total_lots,
+        prepared_at: now.toISOString(),
+        pickup_lat: activeUser?.lat || 23.0300,
+        pickup_lng: activeUser?.lng || 72.5580,
+        pickup_window_start: pickupStart.toISOString(),
+        pickup_window_end: pickupEnd.toISOString(),
+        sender_declared_window_minutes: template.sender_declared_window_minutes,
+        storage_requirement: template.storage_requirement,
+        delivery_mode_offered: template.delivery_mode_offered,
+      })
+
+      setActionNotice({
+        text: `⚡ Successfully generated and published ${template.establishmentType === 'cafeteria' ? 'Cafeteria' : 'Hotel'} surplus batch: "${template.name}" (${template.total_lots * template.lot_size} meals)!`,
+        type: 'success',
+      })
+      await loadData()
+      window.dispatchEvent(new CustomEvent('foodrescue:sync_listings'))
+    } catch (err: any) {
+      console.error('Quick generation failed:', err)
+      setActionNotice({ text: err.message || 'Failed to generate food batch', type: 'error' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleApplyTemplate(template: FoodTemplate) {
+    const activeUser = getCurrentUser()
+    setFormData({
+      name: template.name,
+      category: template.category,
+      veg: template.veg,
+      lot_size: template.lot_size,
+      total_lots: template.total_lots,
+      pickup_lat: activeUser?.lat || 23.0300,
+      pickup_lng: activeUser?.lng || 72.5580,
+      sender_declared_window_minutes: template.sender_declared_window_minutes,
+      storage_requirement: template.storage_requirement,
+      delivery_mode_offered: template.delivery_mode_offered,
+    })
+    setShowCreateModal(true)
+  }
+
   return (
     <div className="space-y-7 pb-4">
       {/* Top Action Bar */}
@@ -421,7 +601,135 @@ export function DonorDashboard() {
         <DonorOrdersManagementPanel requests={donorRequests} onRefresh={loadData} />
       ) : (
         /* Listings Section */
-        <div>
+        <div className="space-y-6">
+          {/* Fast Surplus Food Generation Presets Banner (Cafeteria & Hotel Sections) */}
+          <div className="rounded-3xl border border-teal-200/90 bg-gradient-to-br from-teal-50/70 via-white to-emerald-50/50 p-5 sm:p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-teal-100">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-xs">
+                  <Zap className="w-5 h-5 text-amber-300" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-base font-black text-slate-900 tracking-tight">
+                      Surplus Food Generator Presets
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-teal-100 text-teal-800 border border-teal-200">
+                      1-Click Instant Post
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Quickly generate and publish surplus meal batches for <strong>University / Campus Cafeterias</strong> or <strong>Hotels &amp; Banquets</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Generator Section Selector Tabs: Cafeteria vs Hotel */}
+              <div className="flex items-center space-x-1.5 p-1 rounded-2xl bg-white border border-teal-200 shadow-2xs self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGeneratorTab('cafeteria')
+                    setIsGeneratorOpen(true)
+                  }}
+                  className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    generatorTab === 'cafeteria' && isGeneratorOpen
+                      ? 'bg-teal-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-teal-900 hover:bg-teal-50'
+                  }`}
+                >
+                  <Coffee className="w-3.5 h-3.5" />
+                  <span>☕ Cafeteria Section</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGeneratorTab('hotel')
+                    setIsGeneratorOpen(true)
+                  }}
+                  className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    generatorTab === 'hotel' && isGeneratorOpen
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-emerald-900 hover:bg-emerald-50'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>🏨 Hotel Section</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsGeneratorOpen(!isGeneratorOpen)}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all cursor-pointer"
+                  title={isGeneratorOpen ? 'Minimize presets' : 'Expand presets'}
+                >
+                  {isGeneratorOpen ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+
+            {/* Presets Grid for Selected Establishment Section */}
+            {isGeneratorOpen && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-4">
+                {(generatorTab === 'cafeteria' ? CAFETERIA_PRESETS : HOTEL_PRESETS).map((preset, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white rounded-2xl border border-slate-200/90 p-4 flex flex-col justify-between hover:shadow-md hover:border-teal-300 transition-all group"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">{preset.icon}</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            preset.establishmentType === 'cafeteria'
+                              ? 'bg-teal-50 text-teal-800 border border-teal-200'
+                              : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                          }`}
+                        >
+                          {preset.timeWindow}
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-xs text-slate-900 group-hover:text-teal-700 transition-colors leading-snug">
+                        {preset.name}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+                        {preset.desc}
+                      </p>
+                      <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">
+                          {preset.total_lots * preset.lot_size} meals ({preset.total_lots} lots)
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${preset.veg ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+                          {preset.veg ? 'Veg' : 'Non-veg'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-slate-100 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => handleQuickGenerate(preset)}
+                        className="flex-1 px-2.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] transition-colors flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50 shadow-2xs"
+                        title="Instantly publish this batch to live portal"
+                      >
+                        <Zap className="w-3 h-3 text-amber-300" />
+                        <span>{submitting ? 'Posting...' : '⚡ Generate'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyTemplate(preset)}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-[11px] transition-colors cursor-pointer"
+                        title="Adjust quantity or parameters before posting"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div className="flex items-center space-x-2">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><Layers className="w-4.5 h-4.5" /></span>
@@ -675,7 +983,7 @@ export function DonorDashboard() {
             </div>
 
             {/* Plain-Language Smart Intake Assistant */}
-            <div className="mb-6 p-4 rounded-2xl bg-indigo-50 border border-indigo-200">
+            <div className="mb-4 p-4 rounded-2xl bg-indigo-50 border border-indigo-200">
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
                   Plain-Language Quick Intake
@@ -710,6 +1018,65 @@ export function DonorDashboard() {
                   {intakeParsedNote}
                 </div>
               )}
+            </div>
+
+            {/* Quick Fill Templates Chips */}
+            <div className="mb-5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-extrabold text-slate-700 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Quick Template Presets:</span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium">1-Click Auto Fill</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {CAFETERIA_PRESETS.map((p, idx) => (
+                  <button
+                    key={`cafe-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        name: p.name,
+                        category: p.category,
+                        veg: p.veg,
+                        lot_size: p.lot_size,
+                        total_lots: p.total_lots,
+                        pickup_lat: formData.pickup_lat,
+                        pickup_lng: formData.pickup_lng,
+                        sender_declared_window_minutes: p.sender_declared_window_minutes,
+                        storage_requirement: p.storage_requirement,
+                        delivery_mode_offered: p.delivery_mode_offered,
+                      })
+                    }}
+                    className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-white hover:bg-teal-50 border border-teal-200 text-teal-800 transition-all cursor-pointer shadow-2xs"
+                  >
+                    ☕ {p.name.split('(')[0].trim()}
+                  </button>
+                ))}
+                {HOTEL_PRESETS.slice(0, 2).map((p, idx) => (
+                  <button
+                    key={`hotel-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        name: p.name,
+                        category: p.category,
+                        veg: p.veg,
+                        lot_size: p.lot_size,
+                        total_lots: p.total_lots,
+                        pickup_lat: formData.pickup_lat,
+                        pickup_lng: formData.pickup_lng,
+                        sender_declared_window_minutes: p.sender_declared_window_minutes,
+                        storage_requirement: p.storage_requirement,
+                        delivery_mode_offered: p.delivery_mode_offered,
+                      })
+                    }}
+                    className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-800 transition-all cursor-pointer shadow-2xs"
+                  >
+                    🏨 {p.name.split('(')[0].trim()}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <form onSubmit={handleCreateListing} className="space-y-4">

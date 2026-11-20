@@ -303,6 +303,7 @@ export async function login(
       if (role === 'admin') return 9
       if (role === 'both') return 19
       if (role === 'provider') {
+        if (email.includes('cafeteria')) return 25
         if (email.includes('donor.test')) return 17
         if (email.includes('taj.skyline')) return 10
         if (email.includes('taj.caterers')) return 1
@@ -314,18 +315,24 @@ export async function login(
       return 18
     }
 
+    const isCafeteria = email.includes('cafeteria') || (name && name.toLowerCase().includes('cafeteria'))
+    const defaultProviderName = isCafeteria ? 'Gujarat University Campus Cafeteria' : 'Annapurna Restaurant & Caterers'
+    const defaultProviderAddress = isCafeteria ? 'Gujarat University, Navrangpura, Ahmedabad, Gujarat 380009' : 'CG Road, Navrangpura, Ahmedabad'
+    const defaultProviderLat = isCafeteria ? 23.0384 : 23.0300
+    const defaultProviderLng = isCafeteria ? 72.5458 : 72.5580
+
     const mockUser: User = {
       id: getFallbackId(),
-      name: name || (role === 'admin' ? 'City AMC Operations Admin' : role === 'provider' ? 'Annapurna Restaurant & Caterers' : role === 'both' ? 'Community Food Hub' : 'Apang Manav Mandal Shelter'),
+      name: name || (role === 'admin' ? 'City AMC Operations Admin' : role === 'provider' ? defaultProviderName : role === 'both' ? 'Community Food Hub' : 'Apang Manav Mandal Shelter'),
       email: email,
       phone: phone || '+91 98765 43210',
-      organization: organization || name || (role === 'provider' ? 'Annapurna Restaurant & Caterers' : 'Apang Manav Mandal Shelter'),
-      address: address || (role === 'provider' ? 'CG Road, Navrangpura, Ahmedabad' : role === 'ngo' ? 'Drive In Road, Ahmedabad' : 'Maninagar, Ahmedabad'),
+      organization: organization || name || (role === 'provider' ? defaultProviderName : 'Apang Manav Mandal Shelter'),
+      address: address || (role === 'provider' ? defaultProviderAddress : role === 'ngo' ? 'Drive In Road, Ahmedabad' : 'Maninagar, Ahmedabad'),
       role: role as any,
       verified: true,
       city: 'Ahmedabad',
-      lat: lat || (role === 'provider' ? 23.0300 : role === 'ngo' ? 23.0450 : 22.9940),
-      lng: lng || (role === 'provider' ? 72.5580 : role === 'ngo' ? 72.5270 : 72.6030),
+      lat: lat || (role === 'provider' ? defaultProviderLat : role === 'ngo' ? 23.0450 : 22.9940),
+      lng: lng || (role === 'provider' ? defaultProviderLng : role === 'ngo' ? 72.5270 : 72.6030),
       created_at: new Date().toISOString(),
     }
     const fallbackData = {
